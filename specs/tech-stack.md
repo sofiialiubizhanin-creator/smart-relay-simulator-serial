@@ -20,4 +20,4 @@
 - **One command:** `pytest` run the full suite and produces the report.
 - **Traceability:** test names and docstrings reference AC IDs (e.g. `test_F1_AC_01_...`).
 - **Logging:** every exchange between host and simulator is logged with timestamps into the test report.
-- **Skill:** the agent must use the test-conventions skill whenever it writes or changes E2E tests.
+- **Skill:** the agent must use the e2e-test-conventions skill whenever it writes or changes E2E tests.
