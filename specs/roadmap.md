@@ -1,6 +1,6 @@
 # Roadmap
 
-Each phase follows the cycle: requirements.md -> plan.md -> implementation -> validation. A phase is done when its completion criteria are met. The main criterion is **green E2E**.
+Each phase follows the cycle: requirements.md -> plan.md -> validation.md -> implementation -> validation results. A phase is done when its completion criteria are met. The main criterion is **green E2E**.
 
 ## Phase 1: Simulator + F1 (Relay control and status) - *In progress*
 

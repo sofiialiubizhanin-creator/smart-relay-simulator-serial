@@ -3,7 +3,7 @@ name: e2e-test-conventions
 description: The contract for the Smart Relay Simulator's end-to-end tests in tests/e2e/. It covers deriving tests from specs/<date>-<feature>/requirements.md and validation.md, the simulator/host/control fixtures, AC-ID naming and traceability, waiting without sleep, and when a test may change. Use it whenever you write, add, change, review, debug or fix a test under tests/e2e/. This includes covering an Acceptance Criterion (e.g. "add a test for F1-AC-03"), adding negative, edge or fault-injection cases, updating tests after a requirements.md change (such as the BUSY rate-limit change request), and investigating a red E2E suite, even when the user never says "conventions". Do not use it to implement simulator, host or transport code, for unit tests outside tests/e2e/, for editing requirements/plan/validation documents when no test changes, or for general Python or pytest questions unrelated to this project's E2E suite.
 ---
 
-# E2E test conventions (v1)
+# E2E test conventions (v1.1)
 
 In this project the E2E suite is the contract. A feature is done when every Acceptance Criterion (AC) is covered by a green E2E test (`specs/roadmap.md`). A test is only useful if it states what the requirements say, traces back to them, and is trustworthy. A test bent until it passes is worse than a red one, because it hides a real disagreement between spec and code. Every rule below follows from that.
 
@@ -26,6 +26,7 @@ Don't open simulator, host or transport source to decide what a test should expe
 | `simulator` | A fresh or reset simulator for each test | Isolation: tests share no state and pass in any order |
 | `host` | The host utility the test drives | **Every** relay command, including raw malformed lines for negative cases |
 | `control` | The simulator control API | Setup, fault injection, observation, and advancing simulated time. **Never** relay commands |
+| `host_at(address)` / `host_unreachable` | The host configured with a given address / pointed where nothing listens | Address-configuration and "cannot connect" ACs |
 
 Data flow: test → `host` → serial-over-TCP → simulator. `control` sets up the stage and observes it but never acts as the device's client. A test that sends `ON` through `control` checks nothing about the real path.
 
@@ -38,15 +39,15 @@ test_<FeatureID>_AC_<NN>_<short_description>
 ```
 
 ```python
-def test_F1_AC_03_lowercase_command_rejected(host, control):
-    """F1-AC-03: <AC title, copied from requirements.md>."""
+def test_F1_AC_08_lowercase_command_rejected(host, control):
+    """F1-AC-08: <AC title, copied from requirements.md>."""
     control.set_state(...)                   # arrange via control (values from requirements.md)
     result = host.send_raw("on")             # act only through host
     assert result.response == EXPECTED       # exact expected text from requirements.md
     assert control.get_state() == ...        # optional independent observation
 ```
 
-- The docstring's first line starts with the AC ID in hyphen form (`F1-AC-03`), matching the name.
+- The docstring's first line starts with the AC ID in hyphen form (`F1-AC-08`), matching the name.
 - One test verifies one AC. Several tests per AC are fine. If a scenario seems to need two ACs, write two tests.
 - Put each feature's tests in `tests/e2e/test_<featureid>_<topic>.py`, e.g. `test_f1_relay_control.py`.
 - Every feature needs **positive, negative, edge and fault-injection** tests. Examples are unknown command, lowercase, empty line, repeated `ON`, and silent device. If an important negative case has no AC, propose a new AC to the user. Don't write an untraceable test.
