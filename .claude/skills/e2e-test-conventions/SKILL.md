@@ -3,7 +3,7 @@ name: e2e-test-conventions
 description: The contract for the Smart Relay Simulator's end-to-end tests in tests/e2e/. It covers deriving tests from specs/<date>-<feature>/requirements.md and validation.md, the simulator/host/control fixtures, AC-ID naming and traceability, waiting without sleep, and when a test may change. Use it whenever you write, add, change, review, debug or fix a test under tests/e2e/. This includes covering an Acceptance Criterion (e.g. "add a test for F1-AC-03"), adding negative, edge or fault-injection cases, updating tests after a requirements.md change (such as the BUSY rate-limit change request), and investigating a red E2E suite, even when the user never says "conventions". Do not use it to implement simulator, host or transport code, for unit tests outside tests/e2e/, for editing requirements/plan/validation documents when no test changes, or for general Python or pytest questions unrelated to this project's E2E suite.
 ---
 
-# E2E test conventions (v1.1)
+# E2E test conventions (v1.2)
 
 In this project the E2E suite is the contract. A feature is done when every Acceptance Criterion (AC) is covered by a green E2E test (`specs/roadmap.md`). A test is only useful if it states what the requirements say, traces back to them, and is trustworthy. A test bent until it passes is worse than a red one, because it hides a real disagreement between spec and code. Every rule below follows from that.
 
@@ -29,6 +29,8 @@ Don't open simulator, host or transport source to decide what a test should expe
 | `host_at(address)` / `host_unreachable` | The host configured with a given address / pointed where nothing listens | Address-configuration and "cannot connect" ACs |
 
 Data flow: test → `host` → serial-over-TCP → simulator. `control` sets up the stage and observes it but never acts as the device's client. A test that sends `ON` through `control` checks nothing about the real path.
+
+**Arranging a state vs. arranging a history.** `control.set_state(...)` puts the relay in a state; it doesn't replay the commands that would normally lead there. When an AC's starting point is something an earlier relay command *caused* (for example a rate-limit window opened by a previous toggle), send that earlier command through `host` as part of the arrange step. requirements.md says which control actions count as protocol history; when it says one doesn't (e.g. "`SET_STATE` is not a toggle"), a `control` shortcut would skip exactly the history the rule depends on, and the test would pass or fail for the wrong reason.
 
 The fixtures hide whether the simulator is a thread or a subprocess, and whether `host` wraps the CLI or the client library. Use only the documented interface. The full method contract, return values and `wait_until` are in **[references/fixtures-and-control-api.md](references/fixtures-and-control-api.md)**. Read it before your first use of `host`, `control` or `wait_until` in a session.
 
@@ -74,11 +76,14 @@ When an E2E test fails:
 3. If the test contradicts the requirement (a wrong string copied, a fixture misused), fix the test without changing its AC or intent, and say what you fixed.
 4. If the requirement is ambiguous or contradicts itself, stop and ask the user a spec question. Don't decide alone.
 
-After a requirements change (e.g. Phase 2's BUSY rate limit):
-- Check that requirements.md already describes the change in its "Changes" section. If it doesn't, stop, because the spec comes first.
-- Add tests for new ACs and update tests for changed ACs. In each changed test's docstring, add a line that names the change (see references/traceability.md).
-- Delete a test only when requirements.md removed its AC.
-- Run the whole suite. Earlier features must stay green.
+After a requirements change (a change request such as the BUSY rate limit), work **regression first**. The point is to tell two kinds of red apart: tests that break *because the requirements changed* and tests that break *because the implementation has a bug*. If you update tests before you know which is which, a real regression hides among the intended updates.
+
+1. **Spec first.** Check that requirements.md describes the change in its "Changes" section. If it doesn't, stop.
+2. **Find what the change can affect, across the whole suite.** Read the scenarios (not the implementation) of every test under `tests/`, component tests in `tests/unit/` included, and list the ones the new rule touches, with the reason. For example, if the change rejects certain command sequences, list every test that sends such a sequence. Report this list to the user even when no E2E test is on it; a component test that breaks is still a test the change made obsolete.
+3. **Regression run.** Once the change is implemented, run the suite **unchanged**. Record each failing test (`file::name`, the command sequence that failed, and whether the change explains it) where the feature records validation results (its `validation.md` says where). If the change isn't implemented yet, say so: the regression run is still pending, and your list from step 2 is the expected result it will confirm.
+4. **Update only what the change explains**, keeping each test's intent. Every changed E2E test gets a `Changed:` line naming the change (see references/traceability.md). A failure the change doesn't explain is an implementation bug: report it, don't edit the test.
+5. Add tests for new ACs. Delete a test only when requirements.md removed its AC.
+6. Finish as in §7. Earlier features must stay green.
 
 ## 7. Finish (and review checklist)
 

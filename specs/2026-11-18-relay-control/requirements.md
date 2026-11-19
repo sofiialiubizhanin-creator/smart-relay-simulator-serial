@@ -1,7 +1,7 @@
 # F1: Relay control and status - Requirements
 
-**Status:** v1.1, reviewed 2026-11-19 (v1 plus change C1, see "Changes").
-**Phase:** 1 (see `specs/roadmap.md`)
+**Status:** v1.2, reviewed 2026-11-19 (v1 plus changes C1 and C2, see "Changes").
+**Phase:** 1, changed in Phase 2 by C2 (see `specs/roadmap.md`)
 
 ## 1. Scope
 
@@ -11,6 +11,7 @@ F1 delivers:
 - An interactive shell (`relay-host shell`) where the user types protocol lines, such as `ON`, one after another and sees each response (§4.4).
 - A control API, used only by tests, to set up conditions, inject faults, silence the device, reset it and observe its state.
 - The commands `ON`, `OFF` and `STATUS`, with error handling for invalid input, faults and a silent device.
+- A toggle rate limit: a command that would change the state less than 2 seconds after the previous accepted change gets `ERR BUSY` (§2.6, added by C2).
 
 ## 2. Protocol (host ↔ simulator)
 
@@ -48,9 +49,23 @@ When several conditions apply to one line, the first match in this list decides 
 3. **Too long**: `ERR TOO_LONG`.
 4. **Empty**: `ERR EMPTY`.
 5. **Unknown**: `ERR UNKNOWN_CMD`.
-6. **Valid command**: handled as in §2.2.
+6. **Busy**: a valid command that would change the state within the toggle window gets `ERR BUSY` (§2.6).
+7. **Valid command**: handled as in §2.2.
 
 An error response never changes the relay state.
+
+### 2.6 Toggle rate limit (`BUSY`)
+
+Added by change C2.
+
+- A **toggle** is a valid `ON` or `OFF` that changes the state: `ON` while `OFF`, or `OFF` while `ON`. A repeated `ON` or `OFF` and `STATUS` are not toggles (§9).
+- After an accepted toggle at time T, another toggle is rejected with `ERR BUSY` while less than **2.0 seconds** have passed (time < T + 2.0). From exactly T + 2.0 on, a toggle is accepted again.
+- A rejected toggle doesn't change the state and doesn't restart the window. The window always counts from the last **accepted** toggle.
+- Non-toggles are never `BUSY` and don't start or restart the window, even inside it.
+- After the simulator starts, and after `RESET`, there is no previous toggle, so the first toggle is never `BUSY`. `SET_STATE` (control API) is not a toggle: it neither starts nor restarts the window.
+- **Time** is the simulator's clock.
+  - When the simulator runs as `relay-sim`, its clock follows real time, so a person waits 2 seconds between toggles.
+  - Under the E2E tests, the clock moves only through `ADVANCE_TIME` (§5), so no test depends on wall time.
 
 ## 3. Error codes
 
@@ -60,6 +75,7 @@ An error response never changes the relay state.
 | `ERR EMPTY` | The line is empty, including a line that is only `\r` |
 | `ERR TOO_LONG` | The line is longer than 32 bytes (§2.4) |
 | `ERR FAULT` | A fault is injected. Every line gets this response (§2.5) |
+| `ERR BUSY` | A toggle comes less than 2.0 s after the previous accepted toggle (§2.6). Added by C2 |
 
 ## 4. Host CLI (`relay-host`)
 
@@ -136,11 +152,11 @@ The control API runs on a separate TCP port and uses simple text commands. Only 
 
 | Capability | Command | Behaviour |
 |---|---|---|
-| Set relay state | `SET_STATE ON\|OFF` | Sets the relay state directly, without sending a protocol command |
+| Set relay state | `SET_STATE ON\|OFF` | Sets the relay state directly, without sending a protocol command. Not a toggle, so it doesn't affect the `BUSY` window (§2.6) |
 | Inject / clear fault | `FAULT ON\|OFF` | `ON`: every line gets `ERR FAULT`. `OFF`: clears the fault and keeps the relay state |
 | Silence device | `SILENCE ON\|OFF` | `ON`: the device reads lines but doesn't process them or respond. `OFF`: it responds again. Lines received while silent are dropped, not replayed |
-| Reset | `RESET` | Relay `OFF`, fault cleared, silence cleared, simulated clock reset |
-| Advance time | `ADVANCE_TIME <sec>` | Moves the simulated clock forward. No F1 behaviour depends on time; Phase 2 uses it |
+| Reset | `RESET` | Relay `OFF`, fault cleared, silence cleared, simulated clock reset, `BUSY` window cleared |
+| Advance time | `ADVANCE_TIME <sec>` | Moves the simulated clock forward. The `BUSY` window (§2.6) is measured on this clock |
 | Observe state | `GET_STATE` | Returns the current relay state (`ON` / `OFF`) |
 
 ## 6. Acceptance Criteria
@@ -182,7 +198,7 @@ Each AC must be observable through the host (`relay-host`).
 
 ### Host CLI
 - **F1-AC-18 `send` delivers the line unchanged.** `relay-host send "STATUS"` gives the same stdout and exit code as `relay-host status`. `send "on"` gets `ERR UNKNOWN_CMD`, not `OK`, which shows that the host didn't change the case.
-- **F1-AC-19 The output is the device response, unchanged.** For each device response (`OK`, `STATUS ON`, `STATUS OFF`, `ERR UNKNOWN_CMD`, `ERR EMPTY`, `ERR TOO_LONG`, `ERR FAULT`), stdout is exactly that response followed by one `\n`. The exit code is 0 for `OK` and `STATUS …`, and 1 for `ERR …`.
+- **F1-AC-19 The output is the device response, unchanged.** For each device response (`OK`, `STATUS ON`, `STATUS OFF`, `ERR UNKNOWN_CMD`, `ERR EMPTY`, `ERR TOO_LONG`, `ERR FAULT`, `ERR BUSY`), stdout is exactly that response followed by one `\n`. The exit code is 0 for `OK` and `STATUS …`, and 1 for `ERR …`.
 - **F1-AC-20 Usage errors exit 2 and send nothing.** Each of these exits 2, prints nothing to stdout, and leaves the state unchanged, and the simulator receives nothing:
   - an unknown subcommand,
   - a missing `send` argument,
@@ -215,6 +231,21 @@ In these ACs the shell's input is given as text on standard input (not a termina
   - exits 0,
   - and the simulator receives `ON` (without the mark) and `STATUS`.
 
+### Toggle rate limit (change C2)
+
+In these ACs, "t = x" is the simulator's clock, moved only with `ADVANCE_TIME`. Each AC starts after a reset, so t = 0 and there is no previous toggle.
+
+- **F1-AC-30 A toggle less than 2 s after the previous one is rejected.** From `OFF`, `relay-host on` prints `OK` (t = 0). At t = 1.9, `relay-host off` prints `ERR BUSY` and exits 1, and the state is still `ON`.
+- **F1-AC-31 A toggle exactly 2 s after the previous one is accepted.** From `OFF`, `relay-host on` prints `OK` (t = 0). At t = 2.0, `relay-host off` prints `OK` and exits 0, and the state is `OFF`.
+- **F1-AC-32 A rejected toggle doesn't restart the window.** From `OFF`, `relay-host on` prints `OK` (t = 0). At t = 1.5, `relay-host off` prints `ERR BUSY`. At t = 2.0, `relay-host off` prints `OK`, and the state is `OFF`.
+- **F1-AC-33 Non-toggles are never BUSY and don't restart the window.** From `OFF`, `relay-host on` prints `OK` (t = 0). At t = 0, `relay-host on` prints `OK` and `relay-host status` prints `STATUS ON`, each exiting 0. At t = 1.5, `relay-host on` prints `OK`. At t = 2.0, `relay-host off` prints `OK`, and the state is `OFF`.
+- **F1-AC-34 RESET clears the window.** From `OFF`, `relay-host on` prints `OK` (t = 0). After `RESET`, `relay-host on` prints `OK` right away, and the state is `ON`.
+- **F1-AC-35 SET_STATE is not a toggle.** After `SET_STATE ON` at t = 0, `relay-host off` prints `OK` right away, and the state is `OFF`.
+- **F1-AC-36 Other errors take precedence over BUSY.** From `OFF`, `relay-host on` prints `OK` (t = 0). Then, still at t = 0:
+  - `relay-host send "off"` prints `ERR UNKNOWN_CMD`,
+  - with a fault injected, `relay-host off` prints `ERR FAULT`,
+  - and the state is still `ON`.
+
 ## 7. Edge cases
 
 | Case | Expected behaviour | AC |
@@ -226,6 +257,12 @@ In these ACs the shell's input is given as text on standard input (not a termina
 | 32 bytes, 32 bytes + `\r`, 33 bytes | Within the limit / within the limit / `ERR TOO_LONG` | F1-AC-12 |
 | 10 000-byte line | Exactly one `ERR TOO_LONG`, rest discarded | F1-AC-12 |
 | Repeated `ON` / repeated `OFF` | `OK`, state unchanged | F1-AC-05, F1-AC-06 |
+| Toggle at 1.9 s / exactly 2.0 s after the last accepted toggle | `ERR BUSY` / `OK` | F1-AC-30, F1-AC-31 |
+| Retrying a toggle inside the window | `ERR BUSY`; the window still ends 2.0 s after the accepted toggle | F1-AC-32 |
+| Repeated `ON` or `STATUS` inside the window | Never `BUSY`; window unchanged | F1-AC-33 |
+| First toggle after start, `RESET` or `SET_STATE` | Never `BUSY` | F1-AC-34, F1-AC-35 |
+| Fault, silence, unknown or too-long line inside the window | Those take precedence over `BUSY` (§2.5) | F1-AC-36 |
+| `relay-sim` run by hand follows real time | Toggles 2 s apart work without `ADVANCE_TIME` | none (real time can't be used in E2E tests; checked by hand) |
 | Fault active, any line | `ERR FAULT` | F1-AC-13 |
 | Silent device | No response, host exit 3, state unchanged | F1-AC-15 |
 | Silent and faulted together | Silence wins: no response | F1-AC-15 |
@@ -249,13 +286,13 @@ The simulator doesn't model:
 - Authentication.
 
 Also not in F1:
-- `ERR BUSY` and the toggle rate limit (Phase 2).
 - What the host does if the device closes the connection after the command is sent and before it responds.
 
 ## 9. Design notes (rationale to remember)
 
 - **Why `relay-host send` exists.** The edge cases (lowercase, empty line, unknown command, extra whitespace, too-long line) must be tested end to end through the host, not by talking to the simulator directly. A host with only `on`, `off` and `status` would never send `on` or an empty line, so those cases couldn't be tested. `send` passes a raw line straight to the device, so it must not change it in any way (§4.2).
-- **Why a repeated `ON` is not a toggle.** A repeated `ON` responds `OK` without changing the state. In Phase 2 the rate limit (`BUSY`) applies only to toggles, meaning commands that change the state, so a repeated `ON` doesn't count towards `BUSY`. This keeps Phase 2's rule simple.
+- **Why a repeated `ON` is not a toggle.** A repeated `ON` responds `OK` without changing the state. The rate limit (`BUSY`, §2.6) applies only to toggles, meaning commands that change the state, so a repeated `ON` doesn't count towards `BUSY`. This keeps the rule simple.
+- **Why the window counts from the last accepted toggle (C2).** If rejected attempts restarted the window, a client that keeps retrying could lock the relay out for as long as it retries. Counting from the last real state change keeps the limit predictable. `SET_STATE` and `RESET` are test setup, not device commands, so they don't start the window.
 - **Why the shell sends raw lines and connects per line (C1).** The shell exists so a person can type protocol commands such as `ON` directly, without `relay-host` in front of each one. Sending lines unchanged keeps the protocol rules visible (`on` is still rejected) and reuses `send`'s behaviour. Connecting per line keeps the simulator's single connection free between lines, so tests and other `relay-host` runs work while a shell is open. Keeping a connection open was rejected for that reason.
 
 ## 10. Open questions
@@ -273,3 +310,19 @@ None.
 - **Existing ACs:** F1-AC-01 … F1-AC-23 are unchanged, so no existing test changes.
 - **Amended during planning (2026-11-19, approved by the user):** F1-AC-26 now has the shell handle one line before the other client runs. A handled line is the only observable proof that the shell is running and waiting, not still starting.
 - **Amended during implementation (2026-11-19, approved by the user):** the shell drops a UTF-8 byte-order mark at the very start of its input (§4.4), with the new F1-AC-29 and a §7 row. Found while checking the README example: Windows PowerShell 5.1 adds the mark when piping, so the first piped line got `ERR UNKNOWN_CMD`.
+
+### C2 (2026-11-19): toggle rate limit (`BUSY`), roadmap Phase 2
+
+- **Reason:** roadmap Phase 2. The relay rejects a toggle that comes within 2 seconds of the previous one with a `BUSY` error. Tests use controlled simulator time.
+- **Decided with the user (2026-11-19):**
+  - A toggle at exactly 2.0 s is accepted.
+  - The window counts from the last accepted toggle, and rejections don't restart it.
+  - `relay-sim` follows real time when run by hand, while tests use the controlled clock.
+  - `SET_STATE` is not a toggle, and `RESET` clears the window.
+- **Added:** §1 scope bullet, §2.6, the `ERR BUSY` row in §3, F1-AC-30 … F1-AC-36, §7 rows, and a §9 design note.
+- **Changed:**
+  - §2.5 precedence gets the new rule 6, **Busy**, before valid commands.
+  - §5 `SET_STATE`, `RESET` and `ADVANCE_TIME` now describe their effect on the window.
+  - §8 no longer lists `ERR BUSY` as out of scope.
+- **Changed ACs:** **F1-AC-19** now includes `ERR BUSY` in its list of device responses. Its test gets a new case and a `Changed: C2` line.
+- **Unchanged:** all other ACs (F1-AC-01 … F1-AC-29). None of their scenarios makes two toggles, so none of them can hit `BUSY`.

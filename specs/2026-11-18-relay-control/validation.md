@@ -1,7 +1,7 @@
 # F1: Relay control and status - Validation
 
-**Status:** v1.1, reviewed 2026-11-19 (v1 plus change C1: F1-AC-24 … F1-AC-29).
-**Phase:** 1 (see `specs/roadmap.md`)
+**Status:** v1.2, reviewed 2026-11-19 (v1 plus changes C1 and C2: F1-AC-24 … F1-AC-36, changed F1-AC-19).
+**Phase:** 1, changed in Phase 2 by C2 (see `specs/roadmap.md`)
 **Inputs:** `requirements.md` (cited as "req §N"), `plan.md`, `.claude/skills/e2e-test-conventions/` (fixture contract v1.3)
 
 This document says how each F1 Acceptance Criterion is verified end to end, and records the results. Every expected string and exit code below is copied from `requirements.md`. If they ever differ, `requirements.md` wins and this file is fixed.
@@ -25,12 +25,18 @@ These apply to every F1 E2E test unless an AC below says otherwise.
   - `SHORT_TIMEOUT` (`"0.3"`) is used only in F1-AC-15 and F1-AC-16, to save time.
   - F1-AC-21 passes `--timeout 0.3` because the AC states that value.
   - No `sleep` is used anywhere.
+  - Simulated time (the `BUSY` window, req §2.6) moves only through `control.advance_time(seconds)`. "t = x" in the steps below is that clock. Each test starts at t = 0 after the reset (V1), with no previous toggle.
 - **V8 Notation:** `\r`, `\t` and `\n` mean the actual control characters (req §6). `X×N` means the letter `X` repeated N times.
 - **V9 Shell (C1):**
   - Shell input is passed with `host.shell(input)` or with `host.open_shell()` and `write` / `finish`. Each input line ends with `\n`. Stdin is never a terminal, so no prompt is expected.
   - `stdout` is compared exactly, as the concatenation of the expected response lines. Each line ends with exactly one `\n`.
   - The shell's exit code is asserted exactly (req §4.4). V3 doesn't apply to the shell's exit 0.
   - Where an AC counts stderr lines, the test counts the non-empty lines of `stderr`. Their wording is never asserted.
+- **V10 Regression after a change request (C2, plan D15):**
+  - After a change request is implemented, the whole suite first runs **unchanged**.
+  - Every failing test is recorded in validation-results.md with its file, its name, the command sequence that failed, and whether the change explains the failure.
+  - Only a test whose failure the change explains may be updated, for example a quick sequence of two toggles hitting `BUSY`. An E2E test updated this way gets a `Changed:` line in its docstring that names the change.
+  - Any other failure is an implementation bug and is fixed in the code, not in the test.
 
 ## 2. Timing rule (F1-AC-21)
 
@@ -159,8 +165,9 @@ These bounds are part of the contract. Widening them counts as weakening the tes
   | `ERR EMPTY` | `OFF` | `send ""` | 1 |
   | `ERR TOO_LONG` | `OFF` | `send X×33` | 1 |
   | `ERR FAULT` | `FAULT ON` | `status` | 1 |
+  | `ERR BUSY` | `host.on()` at t = 0 (a toggle; `SET_STATE` doesn't start the window) | `off` at t = 0 | 1 |
 
-  stdout is exactly the response plus one `\n` (V2).
+  stdout is exactly the response plus one `\n` (V2). The `ERR BUSY` row was added by change C2.
 - **F1-AC-20**
   - Arrange: `OFF`.
   - Act with `run(...)`:
@@ -219,14 +226,44 @@ These bounds are part of the contract. Widening them counts as weakening the tes
     - stdout is exactly `OK\nSTATUS ON\n`, exit 0.
     - The exchange log's RX entries are exactly `ON` and `STATUS`, with no mark bytes.
 
+### Toggle rate limit (change C2)
+
+In every step below, "t = x" means `control.advance_time` has moved the clock to x seconds since the test's reset (V7).
+
+- **F1-AC-30**
+  - Act: `on` (t = 0), then `advance_time(1.9)`, then `off`.
+  - Expect: `on` gives `OK`, exit 0. `off` gives `ERR BUSY`, exit 1. The state is `ON`.
+- **F1-AC-31**
+  - Act: `on` (t = 0), then `advance_time(2.0)`, then `off`.
+  - Expect: `off` gives `OK`, exit 0. The state is `OFF`.
+- **F1-AC-32**
+  - Act: `on` (t = 0); `advance_time(1.5)` and `off`; `advance_time(0.5)` (t = 2.0) and `off`.
+  - Expect: the first `off` gives `ERR BUSY`, exit 1, with the state `ON`. The second `off` gives `OK`, exit 0, with the state `OFF`.
+- **F1-AC-33**
+  - Act:
+    1. `on` (t = 0), then `on` and `status`, still at t = 0.
+    2. `advance_time(1.5)` and `on`.
+    3. `advance_time(0.5)` (t = 2.0) and `off`.
+  - Expect: the second and third `on` give `OK`; `status` gives `STATUS ON`; each exits 0. The final `off` gives `OK`, exit 0, with the state `OFF`.
+- **F1-AC-34**
+  - Act: `on` (t = 0); `control.reset()`; `on`.
+  - Expect: the second `on` gives `OK`, exit 0, and the state is `ON`.
+- **F1-AC-35**
+  - Act: `control.set_state("ON")` (t = 0), then `off`.
+  - Expect: `off` gives `OK`, exit 0, and the state is `OFF`.
+- **F1-AC-36**
+  - Act: `on` (t = 0). Still at t = 0: `send "off"`; then `control.fault()` and `off`.
+  - Expect: `send "off"` gives `ERR UNKNOWN_CMD`, exit 1. The faulted `off` gives `ERR FAULT`, exit 1. The state is `ON` throughout.
+
 ## 4. Scenario coverage
 
 | Kind | ACs |
 |---|---|
-| Positive | F1-AC-01, 02, 03, 04, 07, 14, 17, 18, 19, 24, 26 |
-| Negative | F1-AC-08, 09, 10, 11, 20, 22 (no simulator), 23, 24 (lowercase and empty line in the shell), 28 |
-| Edge | F1-AC-05, 06, 07, 12, 27, 29 |
-| Fault injection (control API) | F1-AC-13, 14, 15, 16, 17, 21, 25 |
+| Positive | F1-AC-01, 02, 03, 04, 07, 14, 17, 18, 19, 24, 26, 31 |
+| Negative | F1-AC-08, 09, 10, 11, 20, 22 (no simulator), 23, 24 (lowercase and empty line in the shell), 28, 30 (toggle too soon), 32 (retry too soon) |
+| Edge | F1-AC-05, 06, 07, 12, 27, 29, 31 (exactly 2.0 s), 33, 34, 35 |
+| Fault injection (control API) | F1-AC-13, 14, 15, 16, 17, 21, 25, 36 |
+| Controlled time (control API) | F1-AC-30, 31, 32, 33 |
 
 The negative and fault cases required by the roadmap:
 - Unknown command: F1-AC-10.
@@ -240,6 +277,7 @@ The negative and fault cases required by the roadmap:
 - A connection closed before `\n`.
 - The wording of stderr messages.
 - Shell prompt `relay> ` and Ctrl+C. Both need a real terminal, so they are checked by hand (plan 12.7) and recorded in validation-results.md.
+- `relay-sim` following real time (req §2.6). E2E tests must not wait in real time, so this is checked by hand (plan 13.9) and recorded in validation-results.md. The real-time clock itself has component tests that use a fake time source.
 
 ## Traceability
 
@@ -263,7 +301,7 @@ The negative and fault cases required by the roadmap:
 | F1-AC-16 | tests/e2e/test_f1_fault_silence_reset.py::test_F1_AC_16_ending_silence_restores_operation_without_replay | fault injection (no replay) |
 | F1-AC-17 | tests/e2e/test_f1_fault_silence_reset.py::test_F1_AC_17_reset_restores_initial_condition | fault injection (reset) |
 | F1-AC-18 | tests/e2e/test_f1_host_cli.py::test_F1_AC_18_send_delivers_the_line_unchanged | positive (send transparency) |
-| F1-AC-19 | tests/e2e/test_f1_host_cli.py::test_F1_AC_19_output_is_the_device_response_unchanged | positive (output format) |
+| F1-AC-19 | tests/e2e/test_f1_host_cli.py::test_F1_AC_19_output_is_the_device_response_unchanged | positive (output format); changed by C2 (`ERR BUSY` case) |
 | F1-AC-20 | tests/e2e/test_f1_host_cli.py::test_F1_AC_20_usage_errors_exit_2_and_send_nothing | negative (usage errors) |
 | F1-AC-21 | tests/e2e/test_f1_host_cli.py::test_F1_AC_21_timeout_defaults_to_1s_and_can_be_configured | timeout, timing rule §2 |
 | F1-AC-22 | tests/e2e/test_f1_host_cli.py::test_F1_AC_22_connection_failure_exits_4 | connection failure |
@@ -274,6 +312,13 @@ The negative and fault cases required by the roadmap:
 | F1-AC-27 | tests/e2e/test_f1_host_shell.py::test_F1_AC_27_end_of_input_ends_shell_without_sending | edge (shell: empty input) — C1 |
 | F1-AC-28 | tests/e2e/test_f1_host_shell.py::test_F1_AC_28_extra_argument_to_shell_is_usage_error | negative (shell: usage error) — C1 |
 | F1-AC-29 | tests/e2e/test_f1_host_shell.py::test_F1_AC_29_leading_byte_order_mark_is_dropped | edge (shell: leading byte-order mark from PowerShell) — C1 |
+| F1-AC-30 |  | negative (toggle at t = 1.9 → BUSY) — C2 |
+| F1-AC-31 |  | edge (toggle at exactly t = 2.0 → OK) — C2 |
+| F1-AC-32 |  | negative (rejected toggle doesn't restart the window) — C2 |
+| F1-AC-33 |  | edge (non-toggles never BUSY, window unchanged) — C2 |
+| F1-AC-34 |  | edge (RESET clears the window) — C2 |
+| F1-AC-35 |  | edge (SET_STATE is not a toggle) — C2 |
+| F1-AC-36 |  | fault injection (other errors take precedence over BUSY) — C2 |
 
 ## Results
 

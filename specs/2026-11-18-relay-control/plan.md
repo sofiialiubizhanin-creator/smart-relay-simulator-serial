@@ -1,7 +1,7 @@
 # F1: Relay control and status - Plan
 
-**Status:** v1.1, reviewed 2026-11-19 (v1 plus §12 for requirements change C1).
-**Phase:** 1 (see `specs/roadmap.md`)
+**Status:** v1.2, reviewed 2026-11-19 (v1 plus §12 for change C1 and §13 for change C2).
+**Phase:** 1 (§1–§12, done) and 2 (§13, change C2) (see `specs/roadmap.md`)
 **Inputs:** `requirements.md` (this folder, cited as "req §N"), `specs/mission.md`, `specs/tech-stack.md`, `.claude/skills/e2e-test-conventions/`
 
 This plan says *how* F1 is built and in what order. It doesn't add or change behaviour: anything observable is defined in `requirements.md`. If the two disagree, `requirements.md` wins and the plan gets fixed. Section numbers without "req" refer to this plan.
@@ -222,7 +222,7 @@ The tests are derived only from req §6 and `validation.md`, never from the impl
 
 ---
 
-## 10. Forward compatibility with Phase 2 (no F1 work)
+## 10. Forward compatibility with Phase 2 (no F1 work; used by §13)
 
 - `ManualClock` and `ADVANCE_TIME` already exist, so Phase 2's BUSY window can be measured on simulated time.
 - `RelayDevice.handle_line` keeps the place where a valid command changes state separate from the place where it doesn't. A repeated `ON` is not a toggle (req §9), so this is where the rate-limit check will go.
@@ -309,3 +309,99 @@ Record the result in `validation-results.md`.
 Record the results in `validation-results.md` as a new section. Then return to 9.7, the Phase 1 sign-off.
 
 **Done when:** all of 12.1–12.9 are complete, and the Phase 1 criteria hold for F1-AC-01 … F1-AC-29.
+
+---
+
+## 13. Change C2: toggle rate limit (`BUSY`), roadmap Phase 2
+
+Implements req §2.5 rule 6, §2.6, the `ERR BUSY` row in §3, the §5 updates, F1-AC-30 … F1-AC-36 and the changed F1-AC-19.
+
+Phase 2 is done when the roadmap's Phase 2 criteria hold:
+- requirements.md has its "Changes" section (C2);
+- new and changed ACs are covered by E2E tests;
+- the full suite is green;
+- every updated F1 test is traced to C2;
+- there is a CHANGELOG entry for Phase 2;
+- the README is updated.
+
+### Decisions for C2
+
+| ID | Decision |
+|---|---|
+| D13 | **Where BUSY is decided.** `RelayDevice` keeps `_last_toggle: float \| None` (`None` after start and after `reset()`). In `_command_set`, a command that would change the state is a toggle (§10). `_toggle` returns `ERR BUSY` if `_last_toggle` is set and `clock.now() - _last_toggle < TOGGLE_WINDOW_SECONDS` (2.0). Otherwise it changes the state and sets `_last_toggle = clock.now()`. A rejected toggle doesn't touch `_last_toggle`. `set_state()` doesn't touch it either. The earlier precedence checks (silent, fault, too long, empty, unknown) run before this, so they always win (req §2.5). |
+| D14 | **Clocks.** `clock.py` gets `MonotonicClock`. `now()` is `time.monotonic()` minus a base taken at creation and at `reset()`, plus whatever `advance()` added. `relay-sim` (`__main__`) uses `MonotonicClock`, so manual use follows real time (req §2.6). `Simulator` and `RelayDevice` keep `ManualClock` as the default, so the E2E fixtures, which build `Simulator(port=0, control_port=0)`, keep the controlled clock. |
+| D15 | **Regression first, then test updates** (the user's rule, 2026-11-19). After C2 is implemented, the test suite runs **unchanged**. Every test that fails is listed with its reason. A test may be updated only if C2 explains its failure, typically a quick sequence of two toggles with no time advanced between them. Any other failure is a bug in the implementation, not a reason to change the test. |
+
+**Expected from a static read** (to be confirmed by 13.6). These tests send two toggles without advancing the clock:
+- `test_relay_device.py::test_on_off_status`
+- `test_relay_device.py::test_every_response_is_one_ascii_line`
+- `test_server.py::test_several_commands_on_one_connection`
+- `test_cli.py::test_on_off_status`
+- `test_cli_shell.py::test_lines_are_sent_as_typed_and_responses_printed_in_order`
+
+All five are component tests. No E2E test is expected to fail, because no F1 E2E scenario makes two toggles (req C2, "Unchanged").
+
+### Tasks
+
+13.1 Review requirements change C2. *Done 2026-11-19.*
+
+13.2 Mark Phase 2 in progress in `specs/roadmap.md`, on branch `feature/phase2-busy-rate-limit`. *Done 2026-11-19.*
+
+13.3 Update `validation.md` to v1.2. *Done 2026-11-19.*
+   - Verification steps for F1-AC-30 … F1-AC-36. All of them use `control.advance_time`; there is no real waiting.
+   - The new F1-AC-19 case: after `on`, `off` → `ERR BUSY`, exit 1.
+   - The scenario-coverage rows, and traceability rows for F1-AC-30 … 36.
+   - A new rule **V10, "Regression after a change request"**, describing D15.
+   - The `relay-sim` real-time check, listed as done by hand.
+   - The fixture contract needs no change: `control.advance_time` already exists.
+
+13.4 Implementation (`src/relay_sim/`):
+   - `relay.py`: D13, with `TOGGLE_WINDOW_SECONDS = 2.0` and `ERR_BUSY = b"ERR BUSY\n"`.
+   - `clock.py`: `MonotonicClock` (D14).
+   - `__main__.py`: `relay-sim` uses `MonotonicClock`.
+   - No host change: `ERR BUSY` is an `ERR …` response, so the host already exits 1.
+
+**Done when:** a new `tests/unit/test_busy.py` passes. It covers:
+   - the boundary (1.9 → BUSY, 2.0 → OK);
+   - a rejected toggle not restarting the window;
+   - repeated `ON` and `STATUS` inside the window;
+   - `RESET` and `SET_STATE`;
+   - precedence over BUSY;
+   - `MonotonicClock`, tested with its `advance`/`reset` and a fake time source, so no real waiting.
+
+13.5 *(no separate task: fixtures unchanged, see 13.3)*
+
+13.6 **Regression run (D15).** Run the full suite with the existing tests unchanged. In `validation-results.md` §5, record:
+   - every failing test, with its file and name;
+   - the command sequence that hit `BUSY`, and whether C2 explains the failure;
+   - a comparison with the static list above.
+
+**Done when:** every failure is explained by C2, or reported as an implementation bug and fixed.
+
+13.7 Update the tests listed in 13.6, and only those, keeping each test's intent:
+   - **Component tests:** add `advance_time(2)` (or `device.advance_time`) between the two toggles. Give each a comment naming C2.
+   - **E2E F1-AC-19:** add the `ERR BUSY` case, and add `Changed: C2 toggle rate limit (2026-11-19)` to its docstring (references/traceability.md).
+   - Record each updated test in `validation-results.md` §5.
+
+13.8 New E2E tests in `tests/e2e/test_f1_busy.py` for F1-AC-30 … F1-AC-36, derived only from req §6 and `validation.md`. Fill in their traceability rows.
+
+**Done when:** the checker reports 36/36 ACs and 0 errors.
+
+13.9 Hand check (req §7): with `relay-sim` run by hand,
+   - `relay-host on` then immediately `relay-host off` → `ERR BUSY`;
+   - wait at least 2 s, then `relay-host off` → `OK`.
+
+   Record the result in `validation-results.md`.
+
+13.10 Documentation:
+   - **README:** `ERR BUSY` in the protocol summary and in the exit-code row for `ERR`; that `relay-sim` follows real time (toggles at least 2 s apart). Run every README example before publishing it.
+   - **CHANGELOG:** a `[0.2.0]` entry for Phase 2. Bump the version in `pyproject.toml` to `0.2.0`.
+
+13.11 Validation run:
+   - the checker;
+   - the full `pytest` run;
+   - each E2E file on its own, and one test per file on its own.
+
+   Record the results in `validation-results.md` §6. Then ask the user to sign off Phase 2. After sign-off, mark it done in `specs/roadmap.md` and `CLAUDE.md`.
+
+**Done when:** all of 13.1–13.11 are complete and the roadmap's Phase 2 criteria hold.

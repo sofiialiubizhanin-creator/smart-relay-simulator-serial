@@ -47,4 +47,4 @@ Python 3.11+.
 
 - **Every phase** ends with a `CHANGELOG.md` entry and a `README.md` that explains how to run the program and all tests with one command.
 - **Phase 1 (done, signed off 2026-11-19):** simulator, control API, host CLI (including `relay-host shell`), transport, and the commands `ON` / `OFF` / `STATUS` with error handling. Negative cases include unknown command, lowercase, empty line, repeated `ON`, and a silent device.
-- **Phase 2 (planned):** reject a toggle that comes within 2 seconds of the previous one with `BUSY`, tested with the controlled clock. This phase also requires a "Changes" section in the F1 `requirements.md` and traceability for any updated F1 tests.
+- **Phase 2 (in progress):** reject a toggle that comes within 2 seconds of the previous one with `BUSY`, tested with the controlled clock. This phase also requires a "Changes" section in the F1 `requirements.md` and traceability for any updated F1 tests.

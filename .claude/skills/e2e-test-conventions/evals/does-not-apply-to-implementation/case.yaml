@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: does-not-apply-to-implementation
+expected_outcome: |
+  The agent treats this as implementation work: it changes src/relay_sim/relay.py (BUSY when a toggle comes less than 2.0 s after the last accepted toggle; rejected toggles and set_state don't touch the window; reset clears it). It does not apply the E2E test conventions skill to the task: it does not write or edit files under tests/e2e/ or the validation.md traceability table as part of this request.
