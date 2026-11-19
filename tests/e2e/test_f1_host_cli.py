@@ -27,23 +27,29 @@ def test_F1_AC_18_send_delivers_the_line_unchanged(host, control):
 @pytest.mark.parametrize(
     "arrange, act, response, exit_code",
     [
-        (lambda c: None, lambda h: h.on(), "OK", 0),
-        (lambda c: c.set_state("ON"), lambda h: h.status(), "STATUS ON", 0),
-        (lambda c: None, lambda h: h.status(), "STATUS OFF", 0),
-        (lambda c: None, lambda h: h.send_raw("TOGGLE"), "ERR UNKNOWN_CMD", 1),
-        (lambda c: None, lambda h: h.send_raw(""), "ERR EMPTY", 1),
-        (lambda c: None, lambda h: h.send_raw("X" * 33), "ERR TOO_LONG", 1),
-        (lambda c: c.fault(), lambda h: h.status(), "ERR FAULT", 1),
+        (lambda c, h: None, lambda h: h.on(), "OK", 0),
+        (lambda c, h: c.set_state("ON"), lambda h: h.status(), "STATUS ON", 0),
+        (lambda c, h: None, lambda h: h.status(), "STATUS OFF", 0),
+        (lambda c, h: None, lambda h: h.send_raw("TOGGLE"), "ERR UNKNOWN_CMD", 1),
+        (lambda c, h: None, lambda h: h.send_raw(""), "ERR EMPTY", 1),
+        (lambda c, h: None, lambda h: h.send_raw("X" * 33), "ERR TOO_LONG", 1),
+        (lambda c, h: c.fault(), lambda h: h.status(), "ERR FAULT", 1),
+        # C2: the window is protocol history, so it is opened with a real toggle through host
+        # (SET_STATE is not a toggle). `off` follows at t = 0, inside the window.
+        (lambda c, h: expect_response(h.on(), "OK", 0), lambda h: h.off(), "ERR BUSY", 1),
     ],
-    ids=["OK", "STATUS_ON", "STATUS_OFF", "ERR_UNKNOWN_CMD", "ERR_EMPTY", "ERR_TOO_LONG", "ERR_FAULT"],
+    ids=["OK", "STATUS_ON", "STATUS_OFF", "ERR_UNKNOWN_CMD", "ERR_EMPTY", "ERR_TOO_LONG", "ERR_FAULT", "ERR_BUSY"],
 )
 def test_F1_AC_19_output_is_the_device_response_unchanged(host, control, arrange, act, response, exit_code):
     """F1-AC-19: The output is the device response, unchanged.
 
-    For each device response, stdout is exactly that response followed by one `\\n`.
+    For each device response (`OK`, `STATUS ON`, `STATUS OFF`, `ERR UNKNOWN_CMD`, `ERR EMPTY`,
+    `ERR TOO_LONG`, `ERR FAULT`, `ERR BUSY`), stdout is exactly that response followed by one `\\n`.
     The exit code is 0 for `OK` and `STATUS …`, and 1 for `ERR …`.
+
+    Changed: C2 toggle rate limit (`BUSY`) (2026-11-19)
     """
-    arrange(control)
+    arrange(control, host)
 
     expect_response(act(host), response, exit_code)
 

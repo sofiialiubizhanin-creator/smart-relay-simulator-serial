@@ -64,8 +64,11 @@ def test_responses(sim, send, expected):
 
 def test_several_commands_on_one_connection(sim):
     with connect(sim) as sock:
-        sock.sendall(b"ON\nSTATUS\nOFF\nSTATUS\n")
-        assert [read_line(sock) for _ in range(4)] == [b"OK\n", b"STATUS ON\n", b"OK\n", b"STATUS OFF\n"]
+        sock.sendall(b"ON\nSTATUS\n")
+        assert [read_line(sock) for _ in range(2)] == [b"OK\n", b"STATUS ON\n"]
+        sim.device.advance_time(2)  # Changed by C2: a second toggle needs 2 s, or it gets ERR BUSY
+        sock.sendall(b"OFF\nSTATUS\n")
+        assert [read_line(sock) for _ in range(2)] == [b"OK\n", b"STATUS OFF\n"]
     assert sim.device.get_state() == "OFF"
 
 

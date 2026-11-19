@@ -94,3 +94,51 @@ Results of validating F1 against [validation.md](validation.md). Newest results 
 **Mutation check of the shell: skipped**, by the user's decision on 2026-11-19 (it would take about 5 minutes). The §1 mutation check (15/15) covers F1-AC-01 … F1-AC-23 only. So it is **not shown** that F1-AC-24 … F1-AC-29 fail for a faulty shell. For example, it isn't shown that F1-AC-26 catches a shell that holds its connection open.
 
 **Open spec questions:** none.
+
+## 5. Regression run after change C2 (2026-11-19, plan 13.6, rule V10)
+
+**Code:** commit `bdb9b55` plus the plan 13.4 implementation (uncommitted at the time):
+- BUSY in `relay.py`;
+- `MonotonicClock` in `clock.py`;
+- `relay-sim` using it;
+- the new `tests/unit/test_busy.py`.
+
+**Tests:** every existing test unchanged (`git diff -- tests/` was empty).
+
+**Result:**
+- `pytest`: **4 failed, 305 passed** in 75.0 s.
+- All 66 E2E cases pass unchanged.
+- Checker: 29/36 ACs covered. The 7 errors are F1-AC-30 … F1-AC-36, which have no tests yet (plan 13.8).
+
+Every failure is explained by C2: each test sends a second toggle with no simulated time passing between the toggles.
+
+| Failing test | Command sequence that hit `BUSY` | Observed | Explained by C2? |
+|---|---|---|---|
+| `tests/unit/test_relay_device.py::test_on_off_status` | `ON` then `OFF` on one device, clock not advanced | `ERR BUSY` instead of `OK` | Yes |
+| `tests/unit/test_server.py::test_several_commands_on_one_connection` | `ON`, `STATUS`, `OFF`, `STATUS` on one connection | the third response is `ERR BUSY`, the fourth `STATUS ON` (the state stayed `ON`) | Yes |
+| `tests/unit/test_cli.py::test_on_off_status` | `relay-host on`, `status`, `off` | `off` gives `(1, ERR BUSY)` instead of `(0, OK)` | Yes |
+| `tests/unit/test_cli_shell.py::test_lines_are_sent_as_typed_and_responses_printed_in_order` | shell lines `ON`, `STATUS`, `on`, empty, `OFF` | last response `ERR BUSY` instead of `OK` | Yes |
+
+**Comparison with the static prediction (plan §13):**
+- The plan predicted 5 tests. 4 of them failed, as listed above.
+- `tests/unit/test_relay_device.py::test_every_response_is_one_ascii_line` **passes**. Its `ON`, `STATUS`, `OFF` sequence now gets `ERR BUSY` for the `OFF`. The test only checks that each response is one ASCII line, and `ERR BUSY\n` is one.
+  - Its scenario no longer matches what it was written for. In 13.7 it gets a comment naming C2, but its assertion doesn't change, because nothing it checks is wrong.
+
+**Failures not explained by C2:** none. So no implementation bug was found, and only the four tests above (plus the comment) are updated in plan 13.7.
+
+### Test updates after the regression run (plan 13.7)
+
+Only the tests listed above were changed. Each change keeps the test's intent and names C2.
+
+| Test | Change |
+|---|---|
+| `test_relay_device.py::test_on_off_status` | `advance_time(2)` before `OFF` |
+| `test_relay_device.py::test_every_response_is_one_ascii_line` | Comment only: its `OFF` now gets `ERR BUSY`, still one ASCII line |
+| `test_server.py::test_several_commands_on_one_connection` | Sends `ON`, `STATUS`; advances the clock 2 s; then sends `OFF`, `STATUS` on the same connection |
+| `test_cli.py::test_on_off_status` | `advance_time(2)` before `relay-host off` |
+| `test_cli_shell.py::test_lines_are_sent_as_typed_and_responses_printed_in_order` | The last piped line is `STATUS` instead of `OFF`. Piped input can't advance the clock between lines; toggling through the shell stays covered by F1-AC-24 |
+| E2E `test_f1_host_cli.py::test_F1_AC_19_output_is_the_device_response_unchanged` | New `ERR_BUSY` case (setup is a real toggle through `host`; `off` at t = 0 → `ERR BUSY`, exit 1). Docstring: `Changed: C2 toggle rate limit (BUSY) (2026-11-19)` |
+
+**After the updates:**
+- `pytest`: **310 passed**.
+- The checker still shows 29/36. The 7 missing tests (F1-AC-30 … 36) come in plan 13.8.

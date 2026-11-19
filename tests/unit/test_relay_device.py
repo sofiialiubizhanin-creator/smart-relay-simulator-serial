@@ -24,6 +24,7 @@ def test_on_off_status(dev):
     assert dev.handle_line(b"ON") == b"OK\n"
     assert dev.get_state() == ON
     assert dev.handle_line(b"STATUS") == b"STATUS ON\n"
+    dev.advance_time(2)  # Changed by C2: a second toggle needs 2 s, or it gets ERR BUSY
     assert dev.handle_line(b"OFF") == b"OK\n"
     assert dev.get_state() == OFF
 
@@ -98,6 +99,8 @@ def test_fault_beats_too_long_empty_unknown_and_valid(dev, start, line):
 
 
 def test_every_response_is_one_ascii_line(dev):
+    # Since C2 the OFF below gets ERR BUSY (no time passes after ON). That is still one ASCII
+    # line, so the check holds; the sequence now also covers the ERR BUSY response.
     responses = [dev.handle_line(x) for x in [b"ON", b"STATUS", b"OFF", b"STATUS", b"", TOO_LONG, b"x"]]
     dev.set_fault(True)
     responses.append(dev.handle_line(b"ON"))

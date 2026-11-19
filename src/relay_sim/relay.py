@@ -1,4 +1,4 @@
-"""The relay state machine (req §2.2-§2.5, §3, §5; plan 3.2, 3.4, 3.5)."""
+"""The relay state machine (req §2.2-§2.6, §3, §5; plan 3.2, 3.4, 3.5, D13)."""
 from __future__ import annotations
 
 import threading
@@ -10,6 +10,9 @@ ON = "ON"
 OFF = "OFF"
 STATES = (ON, OFF)
 
+# A toggle less than this many clock seconds after the last accepted toggle gets ERR BUSY (req §2.6).
+TOGGLE_WINDOW_SECONDS = 2.0
+
 OK = b"OK\n"
 STATUS_ON = b"STATUS ON\n"
 STATUS_OFF = b"STATUS OFF\n"
@@ -17,6 +20,7 @@ ERR_UNKNOWN_CMD = b"ERR UNKNOWN_CMD\n"
 ERR_EMPTY = b"ERR EMPTY\n"
 ERR_TOO_LONG = b"ERR TOO_LONG\n"
 ERR_FAULT = b"ERR FAULT\n"
+ERR_BUSY = b"ERR BUSY\n"
 
 
 class RelayDevice:
@@ -28,13 +32,16 @@ class RelayDevice:
         self._state = OFF
         self._fault = False
         self._silent = False
+        # Clock time of the last accepted toggle; None means there is none (after start or reset).
+        self._last_toggle: float | None = None
 
     # --- serial protocol -------------------------------------------------
 
     def handle_line(self, line: Line) -> bytes | None:
         """Process one line. Returns the response, or None for no response.
 
-        Precedence (req §2.5): silent, fault, too long, empty, unknown, valid.
+        Precedence (req §2.5): silent, fault, too long, empty, unknown, busy, valid.
+        Busy is decided in _toggle, so every earlier check wins over it.
         """
         with self._lock:
             if self._silent:
@@ -62,9 +69,14 @@ class RelayDevice:
         return self._toggle(target)
 
     def _toggle(self, target: str) -> bytes:
-        # The only place a command changes the state. Phase 2's rate limit
-        # check belongs here (plan §10).
+        # The only place a command changes the state, so the only place the rate
+        # limit applies (req §2.6, plan D13). A rejected toggle changes neither the
+        # state nor _last_toggle: the window counts from the last accepted toggle.
+        now = self._clock.now()
+        if self._last_toggle is not None and now - self._last_toggle < TOGGLE_WINDOW_SECONDS:
+            return ERR_BUSY
         self._state = target
+        self._last_toggle = now
         return OK
 
     # --- control API -----------------------------------------------------
@@ -77,7 +89,7 @@ class RelayDevice:
         if state not in STATES:
             raise ValueError(f"invalid state {state!r}")
         with self._lock:
-            self._state = state
+            self._state = state  # not a toggle: the BUSY window is left as it is (req §2.6)
 
     def set_fault(self, enabled: bool) -> None:
         with self._lock:
@@ -109,4 +121,5 @@ class RelayDevice:
             self._state = OFF
             self._fault = False
             self._silent = False
+            self._last_toggle = None
             self._clock.reset()

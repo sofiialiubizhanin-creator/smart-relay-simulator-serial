@@ -355,7 +355,7 @@ All five are component tests. No E2E test is expected to fail, because no F1 E2E
    - The `relay-sim` real-time check, listed as done by hand.
    - The fixture contract needs no change: `control.advance_time` already exists.
 
-13.4 Implementation (`src/relay_sim/`):
+13.4 Implementation (`src/relay_sim/`). *Done 2026-11-19.*
    - `relay.py`: D13, with `TOGGLE_WINDOW_SECONDS = 2.0` and `ERR_BUSY = b"ERR BUSY\n"`.
    - `clock.py`: `MonotonicClock` (D14).
    - `__main__.py`: `relay-sim` uses `MonotonicClock`.
@@ -371,19 +371,19 @@ All five are component tests. No E2E test is expected to fail, because no F1 E2E
 
 13.5 *(no separate task: fixtures unchanged, see 13.3)*
 
-13.6 **Regression run (D15).** Run the full suite with the existing tests unchanged. In `validation-results.md` §5, record:
+13.6 **Regression run (D15).** *Done 2026-11-19: 4 failures, all explained by C2 (validation-results.md §5).* Run the full suite with the existing tests unchanged. In `validation-results.md` §5, record:
    - every failing test, with its file and name;
    - the command sequence that hit `BUSY`, and whether C2 explains the failure;
    - a comparison with the static list above.
 
 **Done when:** every failure is explained by C2, or reported as an implementation bug and fixed.
 
-13.7 Update the tests listed in 13.6, and only those, keeping each test's intent:
+13.7 Update the tests listed in 13.6, and only those, keeping each test's intent. *Done 2026-11-19 (validation-results.md §5): 310 passed.*
    - **Component tests:** add `advance_time(2)` (or `device.advance_time`) between the two toggles. Give each a comment naming C2.
    - **E2E F1-AC-19:** add the `ERR BUSY` case, and add `Changed: C2 toggle rate limit (2026-11-19)` to its docstring (references/traceability.md).
    - Record each updated test in `validation-results.md` §5.
 
-13.8 New E2E tests in `tests/e2e/test_f1_busy.py` for F1-AC-30 … F1-AC-36, derived only from req §6 and `validation.md`. Fill in their traceability rows.
+13.8 New E2E tests in `tests/e2e/test_f1_busy.py` for F1-AC-30 … F1-AC-36, derived only from req §6 and `validation.md`. *Done 2026-11-19: 7 tests, checker 36/36.* Fill in their traceability rows.
 
 **Done when:** the checker reports 36/36 ACs and 0 errors.
 

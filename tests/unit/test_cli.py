@@ -64,6 +64,7 @@ def test_on_off_status(sim):
     assert sim.device.get_state() == "ON"
     r = run(addr(sim), "status")
     assert (r.returncode, r.stdout) == (0, b"STATUS ON\n")
+    sim.device.advance_time(2)  # Changed by C2: a second toggle needs 2 s, or it gets ERR BUSY
     r = run(addr(sim), "off")
     assert (r.returncode, r.stdout) == (0, b"OK\n")
     assert sim.device.get_state() == "OFF"

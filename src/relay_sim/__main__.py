@@ -5,6 +5,7 @@ import argparse
 import sys
 import threading
 
+from .clock import MonotonicClock
 from .exchange_log import Entry
 from .simulator import DEFAULT_BIND, DEFAULT_CONTROL_PORT, DEFAULT_SERIAL_PORT, Simulator
 
@@ -27,7 +28,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("-q", "--quiet", action="store_true", help="don't print the exchange log")
     args = parser.parse_args(argv)
 
-    sim = Simulator(bind=args.bind, port=args.port, control_port=args.control_port)
+    # Run by hand, the simulator follows real time, so toggles 2 s apart work (req §2.6, plan D14).
+    clock = MonotonicClock()
+    sim = Simulator(bind=args.bind, port=args.port, control_port=args.control_port, clock=clock)
     if not args.quiet:
         def show(entry: Entry) -> None:
             print(entry.format(), flush=True)

@@ -52,11 +52,14 @@ def rx(sim) -> list[bytes]:
 
 
 def test_lines_are_sent_as_typed_and_responses_printed_in_order(sim):
-    r = shell(addr(sim), b"ON\nSTATUS\non\n\nOFF\n")
+    # Changed by C2: the last line was OFF, a second toggle with no time passing (piped input
+    # can't advance the clock between lines), so it now gets ERR BUSY. STATUS keeps the test's
+    # intent: every line is sent as typed and every response is printed in order.
+    r = shell(addr(sim), b"ON\nSTATUS\non\n\nSTATUS\n")
     assert r.returncode == 0
-    assert r.stdout == b"OK\nSTATUS ON\nERR UNKNOWN_CMD\nERR EMPTY\nOK\n"
+    assert r.stdout == b"OK\nSTATUS ON\nERR UNKNOWN_CMD\nERR EMPTY\nSTATUS ON\n"
     assert r.stderr == b""
-    assert rx(sim) == [b"ON", b"STATUS", b"on", b"", b"OFF"]
+    assert rx(sim) == [b"ON", b"STATUS", b"on", b"", b"STATUS"]
 
 
 def test_crlf_line_endings_are_removed(sim):

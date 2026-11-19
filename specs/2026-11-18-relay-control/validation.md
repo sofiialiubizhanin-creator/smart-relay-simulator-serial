@@ -312,13 +312,13 @@ The negative and fault cases required by the roadmap:
 | F1-AC-27 | tests/e2e/test_f1_host_shell.py::test_F1_AC_27_end_of_input_ends_shell_without_sending | edge (shell: empty input) — C1 |
 | F1-AC-28 | tests/e2e/test_f1_host_shell.py::test_F1_AC_28_extra_argument_to_shell_is_usage_error | negative (shell: usage error) — C1 |
 | F1-AC-29 | tests/e2e/test_f1_host_shell.py::test_F1_AC_29_leading_byte_order_mark_is_dropped | edge (shell: leading byte-order mark from PowerShell) — C1 |
-| F1-AC-30 |  | negative (toggle at t = 1.9 → BUSY) — C2 |
-| F1-AC-31 |  | edge (toggle at exactly t = 2.0 → OK) — C2 |
-| F1-AC-32 |  | negative (rejected toggle doesn't restart the window) — C2 |
-| F1-AC-33 |  | edge (non-toggles never BUSY, window unchanged) — C2 |
-| F1-AC-34 |  | edge (RESET clears the window) — C2 |
-| F1-AC-35 |  | edge (SET_STATE is not a toggle) — C2 |
-| F1-AC-36 |  | fault injection (other errors take precedence over BUSY) — C2 |
+| F1-AC-30 | tests/e2e/test_f1_busy.py::test_F1_AC_30_toggle_within_2s_is_rejected | negative (toggle at t = 1.9 → BUSY) — C2 |
+| F1-AC-31 | tests/e2e/test_f1_busy.py::test_F1_AC_31_toggle_exactly_2s_later_is_accepted | edge (toggle at exactly t = 2.0 → OK) — C2 |
+| F1-AC-32 | tests/e2e/test_f1_busy.py::test_F1_AC_32_rejected_toggle_does_not_restart_window | negative (rejected toggle doesn't restart the window) — C2 |
+| F1-AC-33 | tests/e2e/test_f1_busy.py::test_F1_AC_33_non_toggles_never_busy_and_keep_window | edge (non-toggles never BUSY, window unchanged) — C2 |
+| F1-AC-34 | tests/e2e/test_f1_busy.py::test_F1_AC_34_reset_clears_window | edge (RESET clears the window) — C2 |
+| F1-AC-35 | tests/e2e/test_f1_busy.py::test_F1_AC_35_set_state_is_not_a_toggle | edge (SET_STATE is not a toggle) — C2 |
+| F1-AC-36 | tests/e2e/test_f1_busy.py::test_F1_AC_36_other_errors_take_precedence_over_busy | fault injection (other errors take precedence over BUSY) — C2 |
 
 ## Results
 
@@ -327,3 +327,4 @@ Results are recorded in [validation-results.md](validation-results.md) (decided 
 - §2 Validation run (2026-11-19, commit `e8f7acb`): 262 passed, 23/23 ACs covered, checker clean.
 - §3 Shell hand check, change C1 (2026-11-19): prompt, end of input and Ctrl+C all as expected.
 - §4 Validation run including C1 (2026-11-19): 286 passed, 29/29 ACs covered, checker clean. The shell mutation check was skipped by the user's decision.
+- §5 Regression run after C2 (2026-11-19, rule V10): 4 component tests fail, all explained by C2 (quick toggle sequences); all E2E tests pass unchanged.
