@@ -47,6 +47,13 @@ class RelayClient:
 
         The line is sent exactly as given, encoded as UTF-8, followed by "\\n" (req §4.2).
         """
+        return self.send_bytes(line.encode("utf-8"))
+
+    def send_bytes(self, data: bytes) -> str:
+        """Send `data` unchanged, followed by "\\n", on a new connection; return the response.
+
+        Shared by single-command runs and the shell (plan D10).
+        """
         host, port = parse_address(self.address)
         try:
             port_obj = serial.serial_for_url(f"socket://{host}:{port}", timeout=self.timeout)
@@ -54,7 +61,7 @@ class RelayClient:
             raise HostConnectError(f"cannot connect to {host}:{port}: {exc}") from exc
         try:
             try:
-                port_obj.write(line.encode("utf-8") + b"\n")
+                port_obj.write(data + b"\n")
                 raw = port_obj.read_until(b"\n")  # the timeout covers the whole read
             except serial.SerialException as exc:
                 # The device closed the connection before answering. F1 leaves this

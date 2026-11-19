@@ -1,8 +1,8 @@
 # F1: Relay control and status - Validation
 
-**Status:** v1, draft for review.
+**Status:** v1.1, reviewed 2026-11-19 (v1 plus change C1: F1-AC-24 … F1-AC-28).
 **Phase:** 1 (see `specs/roadmap.md`)
-**Inputs:** `requirements.md` (cited as "req §N"), `plan.md`, `.claude/skills/e2e-test-conventions/` (fixture contract v1.2)
+**Inputs:** `requirements.md` (cited as "req §N"), `plan.md`, `.claude/skills/e2e-test-conventions/` (fixture contract v1.3)
 
 This document says how each F1 Acceptance Criterion is verified end to end, and records the results. Every expected string and exit code below is copied from `requirements.md`. If they ever differ, `requirements.md` wins and this file is fixed.
 
@@ -26,6 +26,11 @@ These apply to every F1 E2E test unless an AC below says otherwise.
   - F1-AC-21 passes `--timeout 0.3` because the AC states that value.
   - No `sleep` is used anywhere.
 - **V8 Notation:** `\r`, `\t` and `\n` mean the actual control characters (req §6). `X×N` means the letter `X` repeated N times.
+- **V9 Shell (C1):**
+  - Shell input is passed with `host.shell(input)` or with `host.open_shell()` and `write` / `finish`. Each input line ends with `\n`. Stdin is never a terminal, so no prompt is expected.
+  - `stdout` is compared exactly, as the concatenation of the expected response lines. Each line ends with exactly one `\n`.
+  - The shell's exit code is asserted exactly (req §4.4). V3 doesn't apply to the shell's exit 0.
+  - Where an AC counts stderr lines, the test counts the non-empty lines of `stderr`. Their wording is never asserted.
 
 ## 2. Timing rule (F1-AC-21)
 
@@ -177,14 +182,51 @@ These bounds are part of the contract. Widening them counts as weakening the tes
   - Expect: exit 4 and V3.
   - If the platform drops an empty environment variable before the host sees it, the empty-string case would test "unset" instead. In that case, raise a spec question; don't change the test.
 
+### Interactive shell (change C1)
+
+- **F1-AC-24**
+  - Arrange: `OFF`.
+  - Act: `host.shell("ON\nSTATUS\non\n\n")`. That is four lines: `ON`, `STATUS`, `on` and an empty line.
+  - Expect: stdout is exactly `OK\nSTATUS ON\nERR UNKNOWN_CMD\nERR EMPTY\n`, exit 0, and the state is `ON`.
+- **F1-AC-25**: two cases.
+  - Silent device:
+    - Arrange: `SILENCE ON`.
+    - Act: `host.shell("STATUS\nSTATUS\n")`.
+  - No simulator:
+    - Act: `host_unreachable.shell("STATUS\nSTATUS\n")`.
+  - Expect (both cases): stdout is empty, stderr has exactly 2 non-empty lines, and exit 0.
+  - Duration: the default 1.0 s timeout applies (V7), so the silent case takes about 2 s. On Windows, the no-simulator case takes about 4 s (2 s per refused connection).
+- **F1-AC-26**
+  - Act:
+    1. `s = host.open_shell()`, then `s.write("STATUS\n")`.
+    2. `wait_until` the exchange log has a TX entry `STATUS OFF`. The shell is now running and waiting for its next line.
+    3. `host.status()`.
+    4. `s.finish()`.
+  - Expect:
+    - Step 3 gives `STATUS OFF`, exit 0.
+    - Step 4 gives exit 0, and the shell's whole stdout is exactly `STATUS OFF\n`.
+  - Step 3 must succeed within the host's default timeout. A shell that held the connection would make it exit 3 instead.
+- **F1-AC-27**
+  - Act: `host.shell("")`.
+  - Expect: stdout is empty, exit 0, and the exchange log has no RX entry.
+- **F1-AC-28**
+  - Act: `host.run("shell", "ON")`.
+  - Expect: exit 2 and V3. The state is `OFF`, and the exchange log has no RX entry.
+- **F1-AC-29**
+  - Arrange: `OFF`.
+  - Act: `host.shell("﻿ON\nSTATUS\n")`. `﻿` written as UTF-8 is the byte-order mark `EF BB BF`.
+  - Expect:
+    - stdout is exactly `OK\nSTATUS ON\n`, exit 0.
+    - The exchange log's RX entries are exactly `ON` and `STATUS`, with no mark bytes.
+
 ## 4. Scenario coverage
 
 | Kind | ACs |
 |---|---|
-| Positive | F1-AC-01, 02, 03, 04, 07, 14, 17, 18, 19 |
-| Negative | F1-AC-08, 09, 10, 11, 20, 23 |
-| Edge | F1-AC-05, 06, 07, 12 |
-| Fault injection (control API) | F1-AC-13, 14, 15, 16, 17, 21, 22 |
+| Positive | F1-AC-01, 02, 03, 04, 07, 14, 17, 18, 19, 24, 26 |
+| Negative | F1-AC-08, 09, 10, 11, 20, 23, 24 (lowercase and empty line in the shell), 28 |
+| Edge | F1-AC-05, 06, 07, 12, 27, 29 |
+| Fault injection (control API) | F1-AC-13, 14, 15, 16, 17, 21, 22, 25 |
 
 The negative and fault cases required by the roadmap:
 - Unknown command: F1-AC-10.
@@ -197,6 +239,7 @@ The negative and fault cases required by the roadmap:
 - Bounded memory for very long lines (a design constraint).
 - A connection closed before `\n`.
 - The wording of stderr messages.
+- Shell prompt `relay> ` and Ctrl+C. Both need a real terminal, so they are checked by hand (plan 12.7) and recorded in validation-results.md.
 
 ## Traceability
 
@@ -225,9 +268,17 @@ The negative and fault cases required by the roadmap:
 | F1-AC-21 | tests/e2e/test_f1_host_cli.py::test_F1_AC_21_timeout_defaults_to_1s_and_can_be_configured | timeout, timing rule §2 |
 | F1-AC-22 | tests/e2e/test_f1_host_cli.py::test_F1_AC_22_connection_failure_exits_4 | connection failure |
 | F1-AC-23 | tests/e2e/test_f1_host_cli.py::test_F1_AC_23_invalid_address_exits_4 | negative (invalid address) |
+| F1-AC-24 | tests/e2e/test_f1_host_shell.py::test_F1_AC_24_shell_sends_lines_as_typed_and_prints_each_response | positive, negative (shell: lines as typed) — C1 |
+| F1-AC-25 | tests/e2e/test_f1_host_shell.py::test_F1_AC_25_no_response_does_not_end_shell_no_simulator<br>tests/e2e/test_f1_host_shell.py::test_F1_AC_25_no_response_does_not_end_shell_silent_device | fault injection (shell: no response, no simulator) — C1 |
+| F1-AC-26 | tests/e2e/test_f1_host_shell.py::test_F1_AC_26_idle_shell_does_not_block_other_clients | positive (shell doesn't block other clients) — C1 |
+| F1-AC-27 | tests/e2e/test_f1_host_shell.py::test_F1_AC_27_end_of_input_ends_shell_without_sending | edge (shell: empty input) — C1 |
+| F1-AC-28 | tests/e2e/test_f1_host_shell.py::test_F1_AC_28_extra_argument_to_shell_is_usage_error | negative (shell: usage error) — C1 |
+| F1-AC-29 | tests/e2e/test_f1_host_shell.py::test_F1_AC_29_leading_byte_order_mark_is_dropped | edge (shell: leading byte-order mark from PowerShell) — C1 |
 
 ## Results
 
 Results are recorded in [validation-results.md](validation-results.md) (decided 2026-11-19):
 - §1 Mutation check (2026-11-19): 15 of 15 planted bugs caught.
-- §2 Validation run (plan task 9.5): not run yet.
+- §2 Validation run (2026-11-19, commit `e8f7acb`): 262 passed, 23/23 ACs covered, checker clean.
+- §3 Shell hand check, change C1 (2026-11-19): prompt, end of input and Ctrl+C all as expected.
+- §4 Validation run including C1 (2026-11-19): 286 passed, 29/29 ACs covered, checker clean. The shell mutation check was skipped by the user's decision.

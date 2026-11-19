@@ -1,12 +1,12 @@
 # F1: Relay control and status - Plan
 
-**Status:** v1, reviewed 2026-11-19.
+**Status:** v1.1, reviewed 2026-11-19 (v1 plus §12 for requirements change C1).
 **Phase:** 1 (see `specs/roadmap.md`)
 **Inputs:** `requirements.md` (this folder, cited as "req §N"), `specs/mission.md`, `specs/tech-stack.md`, `.claude/skills/e2e-test-conventions/`
 
 This plan says *how* F1 is built and in what order. It doesn't add or change behaviour: anything observable is defined in `requirements.md`. If the two disagree, `requirements.md` wins and the plan gets fixed. Section numbers without "req" refer to this plan.
 
-Phase 1 is done when every F1 AC (F1-AC-01 … F1-AC-23) is covered by an E2E test that references it, `pytest` runs the whole suite green with one command, the negative and fault-injection cases are included, a CHANGELOG.md entry for Phase 1 is added, and README.md explains how to run the program and all tests with one command (roadmap, Phase 1).
+Phase 1 is done when every F1 AC (F1-AC-01 … F1-AC-29, including change C1) is covered by an E2E test that references it, `pytest` runs the whole suite green with one command, the negative and fault-injection cases are included, a CHANGELOG.md entry for Phase 1 is added, and README.md explains how to run the program and all tests with one command (roadmap, Phase 1).
 
 ---
 
@@ -216,7 +216,7 @@ The tests are derived only from req §6 and `validation.md`, never from the impl
 9.4 If a test fails, follow the skill's §6: fix the implementation, or raise a spec question. Never weaken a test.
 9.5 Record the results in `validation-results.md` §2 (linked from `validation.md` Results): date, commit, pass count, independence runs and any open spec questions.
 9.6 Add a `CHANGELOG.md` entry for F1 (what the feature delivers, its ACs, and the validation result). Every phase gets an entry (roadmap). Confirm README.md is current.
-9.7 Ask the user to sign off. Only after sign-off, mark Phase 1 done in `specs/roadmap.md`.
+9.7 Ask the user to sign off. Only after sign-off, mark Phase 1 done in `specs/roadmap.md`. *Done 2026-11-19: signed off by the user, roadmap updated.*
 
 **Done when:** all Phase 1 completion criteria in `specs/roadmap.md` are met and the user has signed off.
 
@@ -231,3 +231,81 @@ The tests are derived only from req §6 and `validation.md`, never from the impl
 ## 11. Open questions
 
 None.
+
+---
+
+## 12. Change C1: interactive shell (`relay-host shell`)
+
+Implements req §4.4 and F1-AC-24 … F1-AC-29. Groups 1–9 are done. The Phase 1 sign-off (9.7) waits until this group is complete. Same order as before: documents, then code, then tests, then validation.
+
+### Decisions for C1
+
+| ID | Decision |
+|---|---|
+| D9 | **Input is read as bytes.** The shell reads `sys.stdin.buffer` line by line and strips `\r\n` or `\n`. The remaining bytes go to the device unchanged, so piped input and the Windows console (which delivers UTF-8) behave the same. A UTF-8 byte-order mark at the very start of the input is dropped once (req §4.4, F1-AC-29; added 2026-11-19). |
+| D10 | **Shared send path.** `RelayClient` gets `send_bytes(data: bytes) -> str`. `send_line` becomes `send_bytes(line.encode("utf-8"))`. Single runs and the shell then use the same connect / send / read / close code and the same `HostConnectError` / `HostTimeout` errors. |
+| D11 | **Prompt.** `relay> ` is written to stdout, without a newline, only when `sys.stdin.isatty()` is true (req §4.4). |
+| D12 | **Test interface.** The `host` fixture gets two members: `host.shell(input, *args)` for a whole session, and `host.open_shell(*args)` for a session that stays open while the test does something else (F1-AC-26). See 12.2. |
+
+### Tasks
+
+12.1 Review requirements change C1. *Done 2026-11-19.*
+
+12.2 Update the fixture contract (`.claude/skills/e2e-test-conventions/references/fixtures-and-control-api.md` → v1.3) before any fixture code. *Done 2026-11-19.*
+   - `host.shell(input: str, *args: str) -> HostResult` runs `relay-host [*args] shell`. It writes `input` (UTF-8) to stdin, closes stdin and waits for the exit.
+   - `host.open_shell(*args: str) -> ShellSession` starts the shell and returns at once, with stdin left open. `ShellSession.write(text)` writes more input and keeps stdin open. `ShellSession.finish(input: str = "") -> HostResult` writes `input`, closes stdin and waits for the exit.
+   - Both are logged like other host runs (D8), and the log also shows the stdin text.
+   - `host_at(...)` and `host_unreachable` get the same two members.
+
+12.3 Update `validation.md`. *Done 2026-11-19.*
+   - Verification steps for F1-AC-24 … F1-AC-28.
+   - The shell rows in the scenario-coverage table.
+   - Prompt and Ctrl+C listed as checked by hand (req §7).
+   - Traceability rows for the new ACs, with empty Test(s) cells.
+   - F1-AC-25 uses the default 1.0 s timeout (the user chose not to extend `SHORT_TIMEOUT` to it, 2026-11-19). That adds about 2 s against the silent device, plus about 4 s for the no-simulator case on Windows (2 s per refused connection).
+
+12.4 Host implementation (`src/relay_host/`). *Done 2026-11-19.*
+   - `client.py`: `send_bytes` (D10). `send_line` delegates to it.
+   - `cli.py`: a `shell` subparser with no arguments, so an extra argument → argparse exit 2. The shell loop:
+     - For each line read (D9): strip the line ending, call `send_bytes`, then print the response plus `\n` as bytes to stdout (as in 6.3). On `HostTimeout` or `HostConnectError`, write one line to stderr and continue.
+     - Show the prompt only when stdin is a terminal (D11).
+     - End of input → exit 0. `KeyboardInterrupt` → exit 0, with no traceback.
+   - `send`, `on`, `off` and `status` stay unchanged.
+
+**Done when:** `tests/unit/test_cli_shell.py` passes. It runs the shell as a subprocess with piped input and checks:
+   - the responses in order,
+   - a line split as `\r\n`,
+   - a stderr line per failed input line,
+   - exit 0 on end of input,
+   - exit 2 for an extra argument,
+   - no prompt when piped.
+
+All earlier tests must still pass.
+
+12.5 E2E fixtures: implement `host.shell` and `host.open_shell` in `tests/e2e/conftest.py` as in 12.2. *Done 2026-11-19.*
+
+12.6 E2E tests in `tests/e2e/test_f1_host_shell.py` for F1-AC-24 … F1-AC-28. *Done 2026-11-19.* They are derived only from req §6 and `validation.md`, and are named and documented as in §8. Fill in their traceability rows in the same change.
+
+**Done when:** the traceability checker reports 28/28 ACs covered and 0 errors.
+
+12.7 Check by hand in a real PowerShell window (not automatable, req §7). *Done 2026-11-19 by the user: all as expected (validation-results.md §3).*
+   - the `relay> ` prompt appears,
+   - `ON` → `OK`,
+   - Ctrl+Z then Enter exits 0,
+   - Ctrl+C exits 0 with no traceback.
+
+Record the result in `validation-results.md`.
+
+12.8 Documentation: add a "Shell" section to `README.md`. *Done 2026-11-19.* Update the Phase 1 `CHANGELOG.md` entry to include the shell, since Phase 1 isn't signed off yet. Run every README example before publishing it.
+
+12.8a *Done 2026-11-19.* Byte-order mark (found in 12.8 when the PowerShell pipe example failed; approved by the user 2026-11-19). Spec first: req §4.4, F1-AC-29, the validation.md steps and traceability row. Then drop the mark in `run_shell`, add a unit test and the E2E test for F1-AC-29, and re-run the README example.
+
+12.9 Re-run the step 9 checks. *Done 2026-11-19 (validation-results.md §4); the shell mutation check was skipped by the user's decision.*
+   - the checker,
+   - the full `pytest` run,
+   - each E2E file on its own, and one test per file on its own,
+   - a mutation check of the shell (at least 4 mutations).
+
+Record the results in `validation-results.md` as a new section. Then return to 9.7, the Phase 1 sign-off.
+
+**Done when:** all of 12.1–12.9 are complete, and the Phase 1 criteria hold for F1-AC-01 … F1-AC-29.

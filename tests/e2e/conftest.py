@@ -18,8 +18,6 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Callable
-
 import pytest
 
 from relay_sim.simulator import Simulator
@@ -42,6 +40,60 @@ class _HostRun:
     start: datetime
     end: datetime
     result: HostResult
+    stdin: str | None = None  # shell runs only
+
+
+def _host_env(address: str) -> dict:
+    env = {k: v for k, v in os.environ.items() if k not in ("RELAY_HOST_ADDRESS", "PYTHONPATH")}
+    env["RELAY_HOST_ADDRESS"] = address
+    env["PYTHONPATH"] = _SRC
+    return env
+
+
+def _decode(data: bytes) -> str:
+    # Decoded without newline translation, so a "\r\n" would stay visible.
+    return data.decode("utf-8", errors="backslashreplace")
+
+
+class ShellSession:
+    """A running `relay-host shell` whose stdin stays open until finish()."""
+
+    def __init__(self, host: "Host", args: tuple[str, ...]) -> None:
+        self._host = host
+        self._args = (*args, "shell")
+        self._stdin_text = ""
+        self._start = datetime.now().astimezone()
+        self._t0 = time.perf_counter()
+        self._proc = subprocess.Popen(
+            [sys.executable, "-m", "relay_host", *self._args],
+            env=_host_env(host.address),
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        self.finished = False
+
+    def write(self, text: str) -> None:
+        self._stdin_text += text
+        self._proc.stdin.write(text.encode("utf-8"))
+        self._proc.stdin.flush()
+
+    def finish(self, input: str = "") -> HostResult:
+        if self.finished:
+            raise RuntimeError("ShellSession.finish() was already called")
+        self.finished = True
+        self._stdin_text += input
+        out, err = self._proc.communicate(input.encode("utf-8"), timeout=_HOST_PROCESS_TIMEOUT)
+        result = HostResult(self._proc.returncode, _decode(out), _decode(err), time.perf_counter() - self._t0)
+        self._host._runs.append(
+            _HostRun(self._host.address, self._args, self._start, datetime.now().astimezone(), result, self._stdin_text)
+        )
+        return result
+
+    def kill(self) -> None:
+        if self._proc.poll() is None:
+            self._proc.kill()
+        self._proc.wait()
 
 
 @dataclass
@@ -50,6 +102,7 @@ class Host:
 
     address: str
     _runs: list = field(repr=False)
+    _sessions: list = field(repr=False, default_factory=list)
 
     def on(self) -> HostResult:
         return self.run("on")
@@ -65,33 +118,43 @@ class Host:
         return self.run("send", "--", line)
 
     def run(self, *args: str) -> HostResult:
-        env = {k: v for k, v in os.environ.items() if k not in ("RELAY_HOST_ADDRESS", "PYTHONPATH")}
-        env["RELAY_HOST_ADDRESS"] = self.address
-        env["PYTHONPATH"] = _SRC
         start = datetime.now().astimezone()
         t0 = time.perf_counter()
         proc = subprocess.run(
             [sys.executable, "-m", "relay_host", *args],
-            env=env,
+            env=_host_env(self.address),
             capture_output=True,
             timeout=_HOST_PROCESS_TIMEOUT,
         )
         elapsed = time.perf_counter() - t0
-        result = HostResult(
-            exit_code=proc.returncode,
-            # Decoded without newline translation, so a "\r\n" would stay visible.
-            stdout=proc.stdout.decode("utf-8", errors="backslashreplace"),
-            stderr=proc.stderr.decode("utf-8", errors="backslashreplace"),
-            elapsed=elapsed,
-        )
+        result = HostResult(proc.returncode, _decode(proc.stdout), _decode(proc.stderr), elapsed)
         self._runs.append(_HostRun(self.address, args, start, datetime.now().astimezone(), result))
         return result
 
+    def shell(self, input: str, *args: str) -> HostResult:
+        return self.open_shell(*args).finish(input)
+
+    def open_shell(self, *args: str) -> ShellSession:
+        session = ShellSession(self, args)
+        self._sessions.append(session)
+        return session
+
 
 @pytest.fixture
-def host_at(request) -> Callable[[str], Host]:
+def host_at(request):
     runs = request.node.stash.setdefault(_runs_key, [])
-    return lambda address: Host(address, runs)
+    hosts: list[Host] = []
+
+    def make(address: str) -> Host:
+        h = Host(address, runs)
+        hosts.append(h)
+        return h
+
+    yield make
+    for h in hosts:  # end any shell a test left unfinished
+        for s in h._sessions:
+            if not s.finished:
+                s.kill()
 
 
 @pytest.fixture
@@ -160,9 +223,13 @@ def _render(item: pytest.Item) -> str | None:
         return None
 
     timeline: list[tuple[datetime, int, str]] = []
-    for n, r in enumerate(runs, 1):
+    for n, r in enumerate(sorted(runs, key=lambda r: r.start), 1):  # shells are recorded at finish
         argv = " ".join(["relay-host", *(_show(a.encode("utf-8")) for a in r.args)])
-        timeline.append((r.start, 0, f"{_ts(r.start)} HOST#{n} start  {argv}  [RELAY_HOST_ADDRESS={_show(r.address.encode())}]"))
+        stdin = f"  stdin={_show(r.stdin.encode('utf-8'))}" if r.stdin is not None else ""
+        timeline.append((
+            r.start, 0,
+            f"{_ts(r.start)} HOST#{n} start  {argv}  [RELAY_HOST_ADDRESS={_show(r.address.encode())}]{stdin}",
+        ))
         res = r.result
         timeline.append((
             r.end, 2,

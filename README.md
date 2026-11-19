@@ -57,7 +57,7 @@ relay-host --timeout 0.5 off   # OK
 $LASTEXITCODE                  # exit code of the last command (bash: $?)
 ```
 
-| Exit code | Meaning |
+| Exit code (single commands) | Meaning |
 |---|---|
 | 0 | The device responded without an error (`OK`, `STATUS ON`, `STATUS OFF`) |
 | 1 | The device responded `ERR <CODE>` |
@@ -67,7 +67,33 @@ $LASTEXITCODE                  # exit code of the last command (bash: $?)
 
 The host connects to `127.0.0.1:5555` by default. To use another address, set `RELAY_HOST_ADDRESS=HOST:PORT`.
 
-**Interactive session (optional).** To type protocol lines yourself and see each response, connect with pyserial's terminal:
+### Shell: type commands directly
+
+To type protocol commands one after another, without `relay-host` in front of each one, start the shell:
+
+```powershell
+relay-host shell
+```
+
+```
+relay> ON
+OK
+relay> STATUS
+STATUS ON
+relay> on
+ERR UNKNOWN_CMD
+relay>
+ERR EMPTY
+```
+
+- Each line goes to the device **exactly as typed**, so commands must be uppercase: `ON`, `OFF`, `STATUS`. An empty line is sent too.
+- If a line gets no response, or the simulator can't be reached, the shell prints a one-line message and keeps going.
+- Leave with **Ctrl+Z then Enter** (Windows), **Ctrl+D** (Linux/macOS), or **Ctrl+C**. The exit code is 0.
+- The shell connects once per line, so it never blocks other clients. You can run `relay-host status` in another window while a shell is open.
+- `--timeout` works here too: `relay-host --timeout 0.5 shell`.
+- Input can also be piped, and then no prompt is shown. For example, `"ON", "STATUS" | relay-host shell` prints `OK` and `STATUS ON`. The invisible byte-order mark that Windows PowerShell 5.1 adds when piping is ignored.
+
+**Alternative: pyserial's terminal.** miniterm keeps one connection open for the whole session:
 
 ```powershell
 python -m serial.tools.miniterm --eol LF --echo socket://127.0.0.1:5555

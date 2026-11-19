@@ -1,13 +1,16 @@
 # F1: Relay control and status - Requirements
 
-**Status:** v1, reviewed 2026-11-19.
+**Status:** v1.1, reviewed 2026-11-19 (v1 plus change C1, see "Changes").
 **Phase:** 1 (see `specs/roadmap.md`)
+
+> Items marked belong to change C1 and still need review.
 
 ## 1. Scope
 
 F1 delivers:
 - A simulator that models one relay (`OFF` / `ON`) and speaks a line-based text protocol over serial-over-TCP.
 - A host CLI (`relay-host`) that sends one command per run and reports the device's response and an exit code.
+- An interactive shell (`relay-host shell`) where the user types protocol lines, such as `ON`, one after another and sees each response (§4.4).
 - A control API, used only by tests, to set up conditions, inject faults, silence the device, reset it and observe its state.
 - The commands `ON`, `OFF` and `STATUS`, with error handling for invalid input, faults and a silent device.
 
@@ -69,6 +72,7 @@ An error response never changes the relay state.
 | `relay-host off` | `OFF` |
 | `relay-host status` | `STATUS` |
 | `relay-host send "<raw line>"` | `<raw line>` exactly as given |
+| `relay-host shell` | Each line typed in the shell, exactly as typed (§4.4) |
 
 - Option: `--timeout <seconds>`, default **1.0**. It must be a finite number greater than 0.
 - Address: the host reads the simulator's address from the `RELAY_HOST_ADDRESS` environment variable and uses `127.0.0.1:5555` when the variable isn't set. There is no address CLI option.
@@ -92,6 +96,41 @@ An error response never changes the relay state.
 | 2 | CLI usage error: unknown subcommand, missing or extra arguments, `send` line containing `\n`, invalid `--timeout` (§4.1). Nothing is sent to the device |
 | 3 | No response within the timeout |
 | 4 | Cannot connect to the simulator, including an invalid `RELAY_HOST_ADDRESS` (§4.1) |
+
+This table applies to single-command runs (`on`, `off`, `status`, `send`). The shell has its own exit codes (§4.4).
+
+### 4.4 Interactive shell (`relay-host shell`)
+
+Added by change C1.
+
+**Starting**
+- `relay-host [--timeout <seconds>] shell` starts the shell. It uses the same address (`RELAY_HOST_ADDRESS`) and timeout as the other subcommands.
+- `shell` takes no arguments. An extra argument is a usage error (exit 2), and nothing is sent to the device.
+
+**Input**
+- The shell reads lines from standard input until end of input.
+- From each line it removes the line ending (`\n` or `\r\n`). Everything else is sent to the device **exactly as typed**, the same way `send` does (§4.2). So `ON` is accepted, `on` gets `ERR UNKNOWN_CMD`, and an empty line gets `ERR EMPTY`.
+- No word is reserved. Every line goes to the device.
+- If the input starts with a UTF-8 byte-order mark (bytes `EF BB BF`), the shell drops it before the first line. Windows PowerShell 5.1 adds this mark when it pipes text into a program. Nobody typed it, so it is not part of the line. Only one mark, at the very start of the input, is dropped.
+
+**Connections**
+- Each line is handled like one `relay-host send` run: connect, send the line, wait for one response line, disconnect.
+- The shell holds no connection while it waits for the next line, so other clients are never blocked by an idle shell.
+
+**Output**
+- When the device responds, the shell prints the response unchanged to stdout, followed by exactly one `\n`.
+- When there is no response within the timeout, or the shell can't connect (including an invalid address), it prints one short line to stderr and nothing to stdout. Then it continues with the next line.
+- When standard input is an interactive terminal, the shell shows the prompt `relay> ` before each line. When input is not a terminal (for example, piped from a file), it shows no prompt.
+
+**Leaving**
+- End of input (Ctrl+Z then Enter on Windows, Ctrl+D on Linux/macOS) ends the shell with exit code **0**.
+- Ctrl+C also ends it, with exit code 0 and no error trace.
+- The exit code doesn't depend on the responses received during the session.
+
+| Shell exit code | Meaning |
+|---|---|
+| 0 | The shell ended normally (end of input or Ctrl+C) |
+| 2 | Usage error when starting the shell. Nothing is sent to the device |
 
 ## 5. Control API (tests only)
 
@@ -159,6 +198,25 @@ Each AC must be observable through the host (`relay-host`).
 - **F1-AC-22 A connection failure exits 4.** When no simulator is listening at the address in `RELAY_HOST_ADDRESS`, `relay-host status` exits 4 and prints nothing to stdout.
 - **F1-AC-23 An invalid address exits 4.** With `RELAY_HOST_ADDRESS` set to `127.0.0.1` (no port), `127.0.0.1:abc`, `127.0.0.1:0` or an empty string, `relay-host status` exits 4 and prints nothing to stdout.
 
+### Interactive shell (change C1)
+
+In these ACs the shell's input is given as text on standard input (not a terminal), so no prompt is shown (§4.4).
+
+- **F1-AC-24 The shell sends each line as typed and prints each response.** From `OFF`, `relay-host shell` with the input lines `ON`, `STATUS`, `on` and an empty line:
+  - prints exactly `OK\nSTATUS ON\nERR UNKNOWN_CMD\nERR EMPTY\n` to stdout,
+  - exits 0 at the end of input,
+  - leaves the state `ON`.
+- **F1-AC-25 A line without a response doesn't end the shell.**
+  - With silence on, `relay-host shell` with the input lines `STATUS` and `STATUS` prints nothing to stdout, prints one line to stderr for each input line (two lines), and exits 0.
+  - The same holds when no simulator is listening at the address in `RELAY_HOST_ADDRESS`.
+- **F1-AC-26 An idle shell doesn't block other clients.** A shell gets the input line `STATUS` and prints `STATUS OFF`. While it then waits for the next line, `relay-host status` prints `STATUS OFF` and exits 0. At end of input, the shell exits 0, and its whole stdout is exactly `STATUS OFF\n`.
+- **F1-AC-27 End of input ends the shell without sending anything.** `relay-host shell` with empty input prints nothing to stdout and exits 0, and the simulator receives nothing.
+- **F1-AC-28 An extra argument to `shell` is a usage error.** `relay-host shell ON` exits 2, prints nothing to stdout, and the simulator receives nothing.
+- **F1-AC-29 A leading byte-order mark is dropped.** From `OFF`, `relay-host shell` with input that starts with the UTF-8 byte-order mark followed by the lines `ON` and `STATUS`:
+  - prints exactly `OK\nSTATUS ON\n`,
+  - exits 0,
+  - and the simulator receives `ON` (without the mark) and `STATUS`.
+
 ## 7. Edge cases
 
 | Case | Expected behaviour | AC |
@@ -174,6 +232,12 @@ Each AC must be observable through the host (`relay-host`).
 | Silent device | No response, host exit 3, state unchanged | F1-AC-15 |
 | Silent and faulted together | Silence wins: no response | F1-AC-15 |
 | Invalid `RELAY_HOST_ADDRESS` | Exit 4 | F1-AC-23 |
+| Shell: lowercase line, empty line | Sent unchanged: `ERR UNKNOWN_CMD`, `ERR EMPTY` | F1-AC-24 |
+| Shell: silent device or no simulator | One stderr line per input line, shell continues, exit 0 | F1-AC-25 |
+| Shell: idle while another client connects | The other client is served | F1-AC-26 |
+| Shell: empty input | Exit 0, nothing sent | F1-AC-27 |
+| Shell: input piped from Windows PowerShell 5.1 (starts with a UTF-8 byte-order mark) | The mark is dropped and the first line is handled normally | F1-AC-29 |
+| Shell: prompt and Ctrl+C | Prompt only on a terminal; Ctrl+C exits 0 | none (needs a real terminal; checked by hand) |
 | Connection closed before `\n` | Partial line discarded, no response | none (not tested end to end: the host always ends a line with `\n`) |
 
 ## 8. Out of scope
@@ -194,6 +258,7 @@ Also not in F1:
 
 - **Why `relay-host send` exists.** The edge cases (lowercase, empty line, unknown command, extra whitespace, too-long line) must be tested end to end through the host, not by talking to the simulator directly. A host with only `on`, `off` and `status` would never send `on` or an empty line, so those cases couldn't be tested. `send` passes a raw line straight to the device, so it must not change it in any way (§4.2).
 - **Why a repeated `ON` is not a toggle.** A repeated `ON` responds `OK` without changing the state. In Phase 2 the rate limit (`BUSY`) applies only to toggles, meaning commands that change the state, so a repeated `ON` doesn't count towards `BUSY`. This keeps Phase 2's rule simple.
+- **Why the shell sends raw lines and connects per line (C1).** The shell exists so a person can type protocol commands such as `ON` directly, without `relay-host` in front of each one. Sending lines unchanged keeps the protocol rules visible (`on` is still rejected) and reuses `send`'s behaviour. Connecting per line keeps the simulator's single connection free between lines, so tests and other `relay-host` runs work while a shell is open. Keeping a connection open was rejected for that reason.
 
 ## 10. Open questions
 
@@ -201,4 +266,12 @@ None.
 
 ## Changes
 
-None yet. This is the first version.
+### C1 (2026-11-19): interactive shell for the host
+
+- **Reason:** the user wants to type protocol commands such as `ON` directly, instead of running `relay-host on` for each command.
+- **Decided with the user:** lines are sent exactly as typed, the shell connects once per line, and it ends on end of input or Ctrl+C. No quit word is reserved. The rest of §4.4 was proposed by Claude and approved on 2026-11-19.
+- **Added:** §1 scope bullet, the `shell` row in §4.1, §4.4, F1-AC-24 … F1-AC-29, §7 rows, and a §9 design note.
+- **Changed:** §4.3 now says its exit-code table covers single-command runs only. The behaviour of `on`, `off`, `status` and `send` is unchanged.
+- **Existing ACs:** F1-AC-01 … F1-AC-23 are unchanged, so no existing test changes.
+- **Amended during planning (2026-11-19, approved by the user):** F1-AC-26 now has the shell handle one line before the other client runs. A handled line is the only observable proof that the shell is running and waiting, not still starting.
+- **Amended during implementation (2026-11-19, approved by the user):** the shell drops a UTF-8 byte-order mark at the very start of its input (§4.4), with the new F1-AC-29 and a §7 row. Found while checking the README example: Windows PowerShell 5.1 adds the mark when piping, so the first piped line got `ERR UNKNOWN_CMD`.

@@ -1,10 +1,12 @@
-# Fixtures, control API and helpers: the contract (v1.2)
+# Fixtures, control API and helpers: the contract (v1.3)
 
 > v1.1 (2026-11-19), aligned with F1 `requirements.md`: `control.inject_fault(fault)` replaced by `control.fault(enabled)`; `HostResult` gained `exit_code`, `stdout`, `stderr`, `elapsed`; added `host.run(*args)` and the `host_unreachable` fixture; the fixture never sets a timeout, and one `SHORT_TIMEOUT` (0.3 s) is allowed for silent-device tests only; simulator runs on a thread and `host` wraps the real CLI.
 >
 > v1.2 (2026-11-19): added the `host_at(address)` factory (for F1-AC-23) and `simulator.exchange_log()` (for ACs that say what the simulator receives or sends).
+>
+> v1.3 (2026-11-19, requirements change C1): added `host.shell(input, *args)` and `host.open_shell(*args)` with `ShellSession.write(text)` / `finish(input)`, for the interactive shell (F1-AC-24 … F1-AC-28).
 
-This file defines the interface that E2E tests may rely on. `tests/e2e/conftest.py` and `tests/e2e/helpers.py` don't exist yet. When they are implemented they must match this contract, and if a change is needed this file is updated first.
+This file defines the interface that E2E tests may rely on. `tests/e2e/conftest.py` and `tests/e2e/helpers.py` implement it. They must match this contract, and if a change is needed this file is updated first.
 
 Values such as relay states, fault names, command strings and response text are **not** defined here. They come from the feature's `requirements.md`. Where this file says `<from requirements.md>`, copy the value from there.
 
@@ -38,8 +40,17 @@ The host utility, already connected to the simulator over serial-over-TCP. Every
 | `host.status()` | Send the status query |
 | `host.send_raw(line: str)` | Send `line` exactly as given (plus the line terminator the protocol defines). Use it for negative and edge cases: unknown command, lowercase, empty line, extra whitespace |
 | `host.run(*args: str)` | Run the host with arbitrary arguments, exactly as given, already pointed at the simulator. Use it for usage errors (unknown subcommand, missing or extra arguments, invalid options) and for options such as `--timeout`. Example: `host.run("--timeout", "0.3", "status")` |
+| `host.shell(input: str, *args: str)` | Run the interactive shell (`relay-host [*args] shell`) with `input` as its whole standard input, then wait for it to exit. `input` is text, written as UTF-8. Lines are separated by `"\n"`. Stdin is not a terminal, so no prompt is shown. Example: `host.shell("ON\nSTATUS\n")` |
+| `host.open_shell(*args: str)` | Start the shell and return a `ShellSession` at once, with stdin left open, so the test can do other things while the shell waits for input |
 
-Each call returns a `HostResult`:
+Each call returns a `HostResult`, except `open_shell`, which returns a `ShellSession`:
+
+| `ShellSession` member | Meaning |
+|---|---|
+| `write(text: str) -> None` | Write `text` (UTF-8) to the shell's stdin and flush it, leaving stdin open. Combine it with `wait_until` and the exchange log to know the shell has handled a line |
+| `finish(input: str = "") -> HostResult` | Write `input` to the shell's stdin, close stdin (end of input), wait for the shell to exit, and return its `HostResult`. `stdout` covers the whole session. Call it exactly once. The fixture ends a session that a test leaves unfinished |
+
+The `HostResult` fields:
 
 | Field | Meaning |
 |---|---|
@@ -52,7 +63,7 @@ Each call returns a `HostResult`:
 
 How the host reports errors and timeouts to a CLI user (message text, exit code) is defined in requirements.md. If requirements specify CLI-level behaviour, the `host` fixture will expose it, so check `conftest.py`. Assert on what requirements specify, using exact strings.
 
-`host` runs the real `relay-host` CLI as a subprocess. Tests must still use only the members above, not call the CLI themselves.
+`host` runs the real `relay-host` CLI as a subprocess. Tests must still use only the members above, not call the CLI themselves. Every run is logged into the report, including shell runs and the stdin given to them.
 
 ## `host_at` and `host_unreachable`
 

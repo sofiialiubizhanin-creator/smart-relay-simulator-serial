@@ -6,7 +6,7 @@ Every phase also ends with:
 - A CHANGELOG.md entry for the phase.
 - A README.md that describes how to run the program and all tests with one command, updated for the phase.
 
-## Phase 1: Simulator + F1 (Relay control and status) - *In progress*
+## Phase 1: Simulator + F1 (Relay control and status) - *Done (signed off 2026-11-19)*
 
 **Scope:** relay simulator with a control API, host CLI, serial-over-TCP transport and the commands `ON`, `OFF`, `STATUS` with error handling.
 
