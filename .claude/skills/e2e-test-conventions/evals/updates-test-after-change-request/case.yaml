@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: updates-test-after-change-request
+expected_outcome: |
+  The F1-AC-19 test gets an ERR BUSY case (stdout exactly 'ERR BUSY\n', exit 1) whose setup makes a real toggle through host (not control.set_state, which C2 says doesn't start the window). The test docstring gains a 'Changed:' line naming C2. Existing cases are kept, the traceability row notes the change, and no unrelated test is modified.

@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: writes-busy-window-test
+expected_outcome: |
+  A new E2E test for F1-AC-32 named test_F1_AC_32_..., with a docstring starting 'F1-AC-32', in a tests/e2e/test_f1_*.py file. It sends relay commands only through host, moves time only with control.advance_time (1.5 then 0.5), uses no sleep, asserts ERR BUSY / exit 1 then OK / exit 0 with the state checked via control.get_state, and fills in the F1-AC-32 row of the validation.md traceability table.

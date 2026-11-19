@@ -121,7 +121,7 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--root", default=".", help="repository root (default: current directory)")
     ap.add_argument("--feature", action="append", default=[],
-                    help="feature spec folder, e.g. specs/2026-11-20-relay-control (repeatable; default: all)")
+                    help="feature spec folder, e.g. specs/2026-11-18-relay-control (repeatable; default: all)")
     ap.add_argument("--tests", default="tests/e2e", help="E2E tests folder relative to root")
     args = ap.parse_args(argv)
 

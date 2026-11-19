@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: reviews-bad-e2e-test
+expected_outcome: |
+  The review flags: test names/docstrings without AC IDs (not traceable, no validation.md row); time.sleep in a test; weak assertions (substring 'ERR', exit_code != 0) instead of exact strings from requirements.md (ERR UNKNOWN_CMD, exit 1); and that test_off_works acts through control (set_state OFF) instead of sending the command through host, so it tests nothing about the real path. It suggests running the traceability checker.
+context:
+  scaffold_script: place-files.sh
