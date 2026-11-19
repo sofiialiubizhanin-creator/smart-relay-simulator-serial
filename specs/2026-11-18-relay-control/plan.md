@@ -23,7 +23,7 @@ All decisions were accepted in review on 2026-11-19.
 | D5 | **Non-ASCII input:** the host sends the `send` argument as UTF-8 bytes (req §4.2). The simulator rejects any byte above `0x7F` (req §2.1, §3). |
 | D6 | **Test topology:** the simulator runs in-process on a background thread (ports `0`). The `host` fixture runs the real `relay-host` CLI as a subprocess (`sys.executable -m relay_host`), because the ACs are stated as CLI stdout and exit codes. |
 | D7 | **Connections:** the serial server handles one connection at a time (several hosts are out of scope, req §8). The control server runs on its own thread. A single lock guards the relay state, fault, silence and clock. |
-| D8 | **Exchange log:** the simulator records every received line and sent response with a timestamp and direction (`RX`/`TX`). The `host` fixture records each CLI run with start and end timestamps, argv, exit code, stdout and stderr. Both go into the pytest-html report for each test. |
+| D8 | **Exchange log:** the simulator records every received line and sent response with a timestamp and direction (`RX`/`TX`). The `host` fixture records each CLI run with start and end timestamps, argv, exit code, stdout and stderr. Both go into the pytest-html report (`reports/report.html`) for each test, and the same entries are appended as plain text to `reports/exchange.log` under a header with the test's node ID. Both files are overwritten on each `pytest` run. |
 
 ### 0.1 Control API wire format (D3)
 
@@ -59,7 +59,7 @@ tests/unit/         __init__.py, test_*.py   (component checks for §3–§6; no
 ```
 1.3 Configure pytest in `pyproject.toml`:
    - `testpaths = ["tests"]`, `pythonpath = ["src", "."]`.
-   - `addopts = "--html=reports/report.html --self-contained-html"`.
+   - `addopts = "--html=reports/report.html --self-contained-html -p pytester"` (`pytester` is needed by 7.4).
    - Plain `pytest` from the repo root must work with no other step after installing dependencies.
 1.4 Add `.gitignore` entries for `reports/`, `__pycache__/`, `*.egg-info/`, `.venv/`.
 
@@ -174,9 +174,13 @@ Follows the `e2e-test-conventions` skill and the fixture contract from 2.2.
      - Members: `on()`, `off()`, `status()`, `send_raw(line)`, `run(*args)`.
    - `host`: `host_at("127.0.0.1:<serial_port>")`.
    - `host_unreachable`: `host_at` pointed at a port that was bound and then released, so nothing listens there.
-7.3 A pytest-html hook (`pytest_runtest_makereport`) that attaches each test's exchange log (simulator RX/TX with timestamps) and host runs (D8) to the report.
+7.3 A pytest-html hook (`pytest_runtest_makereport`) that, for every E2E test, passed or failed:
+   - attaches the test's exchange log (simulator RX/TX with timestamps) and host runs (D8) to the report;
+   - appends the same entries to `reports/exchange.log`.
+   - The hook reads the log before the next test's `RESET` clears it.
+7.4 `tests/unit/test_report_logging.py` uses pytest's `pytester` to run a tiny E2E test in a sub-session. It checks that the generated `report.html` and `exchange.log` both contain that test's RX `STATUS` and TX `STATUS OFF` entries with timestamps, and its host run. This makes the logging requirement an automated check, not a manual look at the report.
 
-**Done when:** a first E2E test (F1-AC-01) passes through these fixtures, and its entry in `reports/report.html` shows the exchange log and the host run.
+**Done when:** 7.4 passes, and a first E2E test (F1-AC-01) passes through these fixtures with its exchange in both `reports/report.html` and `reports/exchange.log`.
 
 ---
 
@@ -204,7 +208,7 @@ The tests are derived only from req §6 and `validation.md`, never from the impl
 ## 9. Validation run and Phase 1 close-out
 
 9.1 Run `python .claude/skills/e2e-test-conventions/scripts/check_traceability.py` and get exit code 0.
-9.2 Run `pytest` from the repo root and get a fully green suite. Open `reports/report.html` and confirm that every E2E test has its exchange log and host runs.
+9.2 Run `pytest` from the repo root and get a fully green suite, including 7.4. Confirm that `reports/exchange.log` has a section for every E2E test node ID.
 9.3 Confirm the tests are independent:
    - Run each E2E test file on its own.
    - Run one test from each file on its own (`pytest path::test_F1_AC_NN_...`).
