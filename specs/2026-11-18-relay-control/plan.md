@@ -6,7 +6,7 @@
 
 This plan says *how* F1 is built and in what order. It doesn't add or change behaviour: anything observable is defined in `requirements.md`. If the two disagree, `requirements.md` wins and the plan gets fixed. Section numbers without "req" refer to this plan.
 
-Phase 1 is done when every F1 AC (F1-AC-01 … F1-AC-23) is covered by an E2E test that references it, `pytest` runs the whole suite green with one command, and the negative and fault-injection cases are included (roadmap, Phase 1).
+Phase 1 is done when every F1 AC (F1-AC-01 … F1-AC-23) is covered by an E2E test that references it, `pytest` runs the whole suite green with one command, the negative and fault-injection cases are included, a CHANGELOG.md entry for Phase 1 is added, and README.md explains how to run the program and all tests with one command (roadmap, Phase 1).
 
 ---
 
@@ -62,6 +62,7 @@ tests/unit/         __init__.py, test_*.py   (component checks for §3–§6; no
    - `addopts = "--html=reports/report.html --self-contained-html -p pytester"` (`pytester` is needed by 7.4).
    - Plain `pytest` from the repo root must work with no other step after installing dependencies.
 1.4 Add `.gitignore` entries for `reports/`, `__pycache__/`, `*.egg-info/`, `.venv/`.
+1.5 `README.md` explains how to set up, run the program (`relay-sim`, `relay-host`) and run all tests with one command (`pytest`). Keep it current whenever commands change (roadmap: every phase).
 
 **Done when:** `pip install -e .[test]` succeeds and `pytest` runs (no tests collected yet) and writes `reports/report.html`.
 
@@ -213,10 +214,11 @@ The tests are derived only from req §6 and `validation.md`, never from the impl
    - Run each E2E test file on its own.
    - Run one test from each file on its own (`pytest path::test_F1_AC_NN_...`).
 9.4 If a test fails, follow the skill's §6: fix the implementation, or raise a spec question. Never weaken a test.
-9.5 Record the results in `validation.md`: date, commit, pass count and any open spec questions.
-9.6 Ask the user to sign off. Only after sign-off, mark Phase 1 done in `specs/roadmap.md`.
+9.5 Record the results in `validation-results.md` §2 (linked from `validation.md` Results): date, commit, pass count, independence runs and any open spec questions.
+9.6 Add a `CHANGELOG.md` entry for F1 (what the feature delivers, its ACs, and the validation result). Every phase gets an entry (roadmap). Confirm README.md is current.
+9.7 Ask the user to sign off. Only after sign-off, mark Phase 1 done in `specs/roadmap.md`.
 
-**Done when:** all three Phase 1 completion criteria in `specs/roadmap.md` are met and the user has signed off.
+**Done when:** all Phase 1 completion criteria in `specs/roadmap.md` are met and the user has signed off.
 
 ---
 

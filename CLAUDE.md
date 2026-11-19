@@ -45,5 +45,6 @@ Python 3.11+.
 
 ## Roadmap snapshot
 
+- **Every phase** ends with a `CHANGELOG.md` entry and a `README.md` that explains how to run the program and all tests with one command.
 - **Phase 1 (in progress):** simulator, control API, host CLI, transport, and the commands `ON` / `OFF` / `STATUS` with error handling. Negative cases include unknown command, lowercase, empty line, repeated `ON`, and a silent device.
-- **Phase 2 (planned):** reject a toggle that comes within 2 seconds of the previous one with `BUSY`, tested with the controlled clock. This phase also requires a "Changes" section in the F1 `requirements.md`, traceability for any updated F1 tests, a `CHANGELOG.md` entry, and a README section on running everything with one command.
+- **Phase 2 (planned):** reject a toggle that comes within 2 seconds of the previous one with `BUSY`, tested with the controlled clock. This phase also requires a "Changes" section in the F1 `requirements.md` and traceability for any updated F1 tests.

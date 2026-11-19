@@ -202,30 +202,32 @@ The negative and fault cases required by the roadmap:
 
 | AC ID    | Test(s) | Notes |
 |----------|---------|-------|
-| F1-AC-01 |  | positive |
-| F1-AC-02 |  | positive |
-| F1-AC-03 |  | positive |
-| F1-AC-04 |  | positive |
-| F1-AC-05 |  | edge (repeated ON) |
-| F1-AC-06 |  | edge (repeated OFF) |
-| F1-AC-07 |  | edge (trailing CR) |
-| F1-AC-08 |  | negative (lowercase) |
-| F1-AC-09 |  | negative (whitespace, arguments) |
-| F1-AC-10 |  | negative (unknown, non-ASCII) |
-| F1-AC-11 |  | negative (empty line) |
-| F1-AC-12 |  | edge (32 / 32+CR / 33 / 10 000 bytes) |
-| F1-AC-13 |  | fault injection |
-| F1-AC-14 |  | fault injection |
-| F1-AC-15 |  | fault injection (silent, silent + fault) |
-| F1-AC-16 |  | fault injection (no replay) |
-| F1-AC-17 |  | fault injection (reset) |
-| F1-AC-18 |  | positive (send transparency) |
-| F1-AC-19 |  | positive (output format) |
-| F1-AC-20 |  | negative (usage errors) |
-| F1-AC-21 |  | timeout, timing rule §2 |
-| F1-AC-22 |  | connection failure |
-| F1-AC-23 |  | negative (invalid address) |
+| F1-AC-01 | tests/e2e/test_f1_relay_control.py::test_F1_AC_01_initial_state_is_off | positive |
+| F1-AC-02 | tests/e2e/test_f1_relay_control.py::test_F1_AC_02_on_turns_relay_on | positive |
+| F1-AC-03 | tests/e2e/test_f1_relay_control.py::test_F1_AC_03_off_turns_relay_off | positive |
+| F1-AC-04 | tests/e2e/test_f1_relay_control.py::test_F1_AC_04_status_reports_state_without_changing_it | positive |
+| F1-AC-05 | tests/e2e/test_f1_relay_control.py::test_F1_AC_05_repeated_on_is_accepted_and_changes_nothing | edge (repeated ON) |
+| F1-AC-06 | tests/e2e/test_f1_relay_control.py::test_F1_AC_06_repeated_off_is_accepted_and_changes_nothing | edge (repeated OFF) |
+| F1-AC-07 | tests/e2e/test_f1_relay_control.py::test_F1_AC_07_trailing_cr_is_ignored | edge (trailing CR) |
+| F1-AC-08 | tests/e2e/test_f1_input_errors.py::test_F1_AC_08_lowercase_is_rejected | negative (lowercase) |
+| F1-AC-09 | tests/e2e/test_f1_input_errors.py::test_F1_AC_09_extra_whitespace_or_arguments_are_rejected | negative (whitespace, arguments) |
+| F1-AC-10 | tests/e2e/test_f1_input_errors.py::test_F1_AC_10_non_ascii_line_is_rejected<br>tests/e2e/test_f1_input_errors.py::test_F1_AC_10_unknown_command_is_rejected | negative (unknown, non-ASCII) |
+| F1-AC-11 | tests/e2e/test_f1_input_errors.py::test_F1_AC_11_empty_line_is_rejected | negative (empty line) |
+| F1-AC-12 | tests/e2e/test_f1_input_errors.py::test_F1_AC_12_line_length_limit_is_enforced<br>tests/e2e/test_f1_input_errors.py::test_F1_AC_12_very_long_line_gets_exactly_one_error | edge (32 / 32+CR / 33 / 10 000 bytes) |
+| F1-AC-13 | tests/e2e/test_f1_fault_silence_reset.py::test_F1_AC_13_faulted_device_rejects_everything | fault injection |
+| F1-AC-14 | tests/e2e/test_f1_fault_silence_reset.py::test_F1_AC_14_clearing_fault_restores_normal_operation | fault injection |
+| F1-AC-15 | tests/e2e/test_f1_fault_silence_reset.py::test_F1_AC_15_silent_device_does_not_respond | fault injection (silent, silent + fault) |
+| F1-AC-16 | tests/e2e/test_f1_fault_silence_reset.py::test_F1_AC_16_ending_silence_restores_operation_without_replay | fault injection (no replay) |
+| F1-AC-17 | tests/e2e/test_f1_fault_silence_reset.py::test_F1_AC_17_reset_restores_initial_condition | fault injection (reset) |
+| F1-AC-18 | tests/e2e/test_f1_host_cli.py::test_F1_AC_18_send_delivers_the_line_unchanged | positive (send transparency) |
+| F1-AC-19 | tests/e2e/test_f1_host_cli.py::test_F1_AC_19_output_is_the_device_response_unchanged | positive (output format) |
+| F1-AC-20 | tests/e2e/test_f1_host_cli.py::test_F1_AC_20_usage_errors_exit_2_and_send_nothing | negative (usage errors) |
+| F1-AC-21 | tests/e2e/test_f1_host_cli.py::test_F1_AC_21_timeout_defaults_to_1s_and_can_be_configured | timeout, timing rule §2 |
+| F1-AC-22 | tests/e2e/test_f1_host_cli.py::test_F1_AC_22_connection_failure_exits_4 | connection failure |
+| F1-AC-23 | tests/e2e/test_f1_host_cli.py::test_F1_AC_23_invalid_address_exits_4 | negative (invalid address) |
 
 ## Results
 
-Not run yet. Filled in by plan task 9.5 with the date, commit, pass count and any open spec questions.
+Results are recorded in [validation-results.md](validation-results.md) (decided 2026-11-19):
+- §1 Mutation check (2026-11-19): 15 of 15 planted bugs caught.
+- §2 Validation run (plan task 9.5): not run yet.
