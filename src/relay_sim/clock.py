@@ -6,7 +6,7 @@ from typing import Protocol
 
 
 class Clock(Protocol):
-    """What the simulator needs from a clock. Time moves only via advance()."""
+    """What the simulator needs from a clock. Time moves only via advance() and reset()."""
 
     def now(self) -> float: ...
     def advance(self, seconds: float) -> None: ...

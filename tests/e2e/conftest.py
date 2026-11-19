@@ -81,9 +81,10 @@ class ShellSession:
     def finish(self, input: str = "") -> HostResult:
         if self.finished:
             raise RuntimeError("ShellSession.finish() was already called")
-        self.finished = True
         self._stdin_text += input
         out, err = self._proc.communicate(input.encode("utf-8"), timeout=_HOST_PROCESS_TIMEOUT)
+        # Marked only after a clean exit, so a timed-out shell is still killed at teardown.
+        self.finished = True
         result = HostResult(self._proc.returncode, _decode(out), _decode(err), time.perf_counter() - self._t0)
         self._host._runs.append(
             _HostRun(self._host.address, self._args, self._start, datetime.now().astimezone(), result, self._stdin_text)
@@ -93,7 +94,7 @@ class ShellSession:
     def kill(self) -> None:
         if self._proc.poll() is None:
             self._proc.kill()
-        self._proc.wait()
+        self._proc.communicate()  # waits, and closes the stdin/stdout/stderr pipes
 
 
 @dataclass

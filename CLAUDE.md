@@ -22,9 +22,9 @@ requirements.md → plan.md → validation.md → implementation → validation 
 
 ## Commands
 
-- `pytest` runs the full E2E suite and produces the pytest-html report. Everything must stay runnable with this one command.
+- `pytest` runs the full test suite (E2E and component tests) and produces the pytest-html report. Everything must stay runnable with this one command.
 - `pytest path/to/test_file.py::test_F1_AC_01_name` runs a single test.
-- `relay-host on|off|status` is the host CLI.
+- `relay-host on|off|status|send <line>|shell` is the host CLI.
 - `python .claude/skills/e2e-test-conventions/scripts/check_traceability.py` checks AC ↔ test ↔ validation.md traceability (exit 1 on errors).
 
 ## Architecture

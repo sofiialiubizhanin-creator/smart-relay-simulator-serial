@@ -23,7 +23,8 @@ def control(sim):
 def serial_exchange(sim, line: bytes) -> bytes:
     with socket.create_connection(("127.0.0.1", sim.serial_port), timeout=2) as sock:
         sock.sendall(line + b"\n")
-        return sock.makefile("rb").readline()
+        with sock.makefile("rb") as replies:
+            return replies.readline()
 
 
 def test_get_state_and_set_state(sim, control):

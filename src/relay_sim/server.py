@@ -7,7 +7,7 @@ import socketserver
 import threading
 
 from .exchange_log import RX, TOO_LONG_PLACEHOLDER, TX, ExchangeLog
-from .protocol import LineReader, _TooLong
+from .protocol import TOO_LONG, LineReader
 from .relay import RelayDevice
 
 _POLL_SECONDS = 0.2  # how often a handler checks for shutdown while idle
@@ -31,15 +31,16 @@ class _SerialHandler(socketserver.BaseRequestHandler):
             if not data:
                 return  # client closed; any partial line is dropped (req §7)
             for line in reader.feed(data):
-                log.add(RX, TOO_LONG_PLACEHOLDER if isinstance(line, _TooLong) else line)
+                log.add(RX, TOO_LONG_PLACEHOLDER if line is TOO_LONG else line)
                 response = device.handle_line(line)
                 if response is None:
                     continue
+                # Log before sending, so the entry exists by the time the client has the response.
+                log.add(TX, response.rstrip(b"\n"))
                 try:
                     sock.sendall(response)
                 except OSError:
                     return
-                log.add(TX, response.rstrip(b"\n"))
 
 
 class SerialServer(socketserver.TCPServer):

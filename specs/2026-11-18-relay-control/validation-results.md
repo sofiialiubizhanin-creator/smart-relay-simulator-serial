@@ -61,7 +61,7 @@ Results of validating F1 against [validation.md](validation.md). Newest results 
 ## 3. Shell hand check, change C1 (2026-11-19)
 
 **Purpose:** check the shell behaviour that needs a real terminal and can't be automated (req §4.4 and §7; plan 12.7).
-**Done by:** the user, in Windows PowerShell, with `relay-sim` running in a second window. **Code:** the uncommitted working tree after plan 12.6 (on top of commit `e8f7acb`).
+**Done by:** the user, in Windows PowerShell, with `relay-sim` running in a second window. **Code:** the working tree after plan 12.6, on top of commit `e8f7acb` (later committed as `b90c25c`).
 
 | # | Step | Expected | Result |
 |---|---|---|---|
@@ -79,7 +79,7 @@ Results of validating F1 against [validation.md](validation.md). Newest results 
 
 ## 4. Validation run including change C1 (2026-11-19)
 
-**Code:** the working tree after plan 12.8a (C1 with the byte-order-mark amendment), on top of commit `e8f7acb`. **Environment:** as in §2.
+**Code:** the working tree after plan 12.8a (C1 with the byte-order-mark amendment), on top of commit `e8f7acb` (later committed as `b90c25c`). **Environment:** as in §2.
 
 | Plan task | Check | Result |
 |---|---|---|
@@ -89,7 +89,7 @@ Results of validating F1 against [validation.md](validation.md). Newest results 
 | 12.9 / 9.3 | Each E2E file on its own | `test_f1_relay_control.py` 7 passed · `test_f1_input_errors.py` 19 passed · `test_f1_fault_silence_reset.py` 11 passed · `test_f1_host_cli.py` 22 passed · `test_f1_host_shell.py` 7 passed |
 | 12.9 / 9.3 | One test per file on its own | F1-AC-07, F1-AC-12 (10 000 bytes), F1-AC-16, F1-AC-22, F1-AC-26: each passed |
 | 12.7 | Shell hand check | All as expected (§3) |
-| 12.8a | README PowerShell pipe example (`"ON", "STATUS", "on" \| relay-host shell`) | `OK`, `STATUS ON`, `ERR UNKNOWN_CMD`, exit 0 |
+| 12.8a | README PowerShell pipe example, extended with `on` (`"ON", "STATUS", "on" \| relay-host shell`) | `OK`, `STATUS ON`, `ERR UNKNOWN_CMD`, exit 0 |
 
 **Mutation check of the shell: skipped**, by the user's decision on 2026-11-19 (it would take about 5 minutes). The §1 mutation check (15/15) covers F1-AC-01 … F1-AC-23 only. So it is **not shown** that F1-AC-24 … F1-AC-29 fail for a faulty shell. For example, it isn't shown that F1-AC-26 catches a shell that holds its connection open.
 

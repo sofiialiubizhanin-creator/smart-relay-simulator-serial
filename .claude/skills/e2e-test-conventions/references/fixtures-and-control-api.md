@@ -17,7 +17,7 @@ Values such as relay states, fault names, command strings and response text are 
 - `control`
 - `wait_until`
 - Time: simulated vs real
-- Open points (decide when implementing)
+- Decisions
 
 ---
 
@@ -61,7 +61,7 @@ The `HostResult` fields:
 | `response: str \| None` | `stdout` without the trailing line terminator. `None` if stdout is empty |
 | `timed_out: bool` | True if the host reported "no response within the timeout" (the exit code requirements.md assigns to it). A connection problem is not a timeout |
 
-How the host reports errors and timeouts to a CLI user (message text, exit code) is defined in requirements.md. If requirements specify CLI-level behaviour, the `host` fixture will expose it, so check `conftest.py`. Assert on what requirements specify, using exact strings.
+How the host reports errors and timeouts to a CLI user (message text, exit code) is defined in requirements.md. Assert on what requirements specify, using exact strings.
 
 `host` runs the real `relay-host` CLI as a subprocess. Tests must still use only the members above, not call the CLI themselves. Every run is logged into the report, including shell runs and the stdin given to them.
 
@@ -121,12 +121,8 @@ wait_until(condition, timeout, interval=0.05, message=None)
 - A test that checks the default timeout itself (F1-AC-21's default case) must not pass `--timeout`. A value an AC states explicitly (F1-AC-21's `--timeout 0.3`) is used because the AC says so, not as a time saving.
 - Any other timeout value, or using `SHORT_TIMEOUT` anywhere else, needs the user's approval first. Ask; don't add it.
 
-## Open points (decide when implementing)
+## Decisions
 
-These are not decided yet. Don't hardcode an answer in tests. Ask the user if a test depends on one.
-- Exact protocol strings, response format and error codes come from F1's requirements.md.
-
-
-Decided (2026-11-19):
+Decided on 2026-11-19. Exact protocol strings, response format and error codes always come from the feature's requirements.md, never from this file.
 - The simulator runs in-process on a background thread, on free ports chosen at start-up. Tests still must not depend on this.
 - `host` runs the real `relay-host` CLI as a subprocess. The CLI-level fields of `HostResult` are listed in the `host` section.

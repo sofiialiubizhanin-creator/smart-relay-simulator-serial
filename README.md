@@ -3,7 +3,7 @@
 A software model of a single relay, controlled through a text command protocol over serial-over-TCP, plus a host CLI (`relay-host`) to control it from a terminal. No hardware is involved.
 
 - `relay-sim`: the simulated relay. Listens on `127.0.0.1:5555` (relay commands) and `127.0.0.1:5556` (control API, used only by tests).
-- `relay-host`: sends one command to the relay and prints the response.
+- `relay-host`: sends one command to the relay and prints the response, or opens an interactive shell (`relay-host shell`).
 
 Specifications live in [`specs/`](specs/): [mission](specs/mission.md), [roadmap](specs/roadmap.md), [tech stack](specs/tech-stack.md), and one folder per feature (requirements, plan, validation).
 
@@ -110,7 +110,7 @@ One ASCII command per line, ending with `\n`. Commands are exactly `ON`, `OFF` a
 ```
 src/relay_sim/     simulator: protocol, relay state machine, serial and control servers
 src/relay_host/    host client library and the relay-host CLI
-tests/e2e/         E2E suite (one test per acceptance criterion, named test_F1_AC_NN_...)
+tests/e2e/         E2E suite (at least one test per acceptance criterion, named test_F1_AC_NN_...)
 tests/unit/        component tests
 specs/             mission, roadmap, tech stack, and per-feature specs
 ```

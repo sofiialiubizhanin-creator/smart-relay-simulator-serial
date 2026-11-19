@@ -5,23 +5,16 @@ MAX_LINE_BYTES = 32
 _CR = 0x0D
 
 
-class _TooLong:
-    """Marker yielded instead of a line that was over the length limit."""
-
-    _instance: "_TooLong | None" = None
-
-    def __new__(cls) -> "_TooLong":
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
+class TooLong:
+    """Type of TOO_LONG, the marker yielded instead of a line over the length limit."""
 
     def __repr__(self) -> str:
         return "TOO_LONG"
 
 
-TOO_LONG = _TooLong()
+TOO_LONG = TooLong()  # the only instance; compare with `line is TOO_LONG`
 
-Line = bytes | _TooLong
+Line = bytes | TooLong
 
 
 class LineReader:

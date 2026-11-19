@@ -1,4 +1,4 @@
-"""relay-host: send one command to the relay and report the response (req §4; plan 6.2-6.4)."""
+"""relay-host: send commands to the relay, one per run or interactively with `shell` (req §4; plan 6.2-6.4, §12)."""
 from __future__ import annotations
 
 import argparse
@@ -17,7 +17,6 @@ from .client import (
 
 EXIT_OK = 0
 EXIT_DEVICE_ERROR = 1
-EXIT_USAGE = 2  # argparse also uses 2 for its own errors
 EXIT_NO_RESPONSE = 3
 EXIT_CONNECT = 4
 
@@ -38,7 +37,7 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="relay-host",
         description=(
-            "Send one command to the simulated relay. "
+            "Send commands to the simulated relay: one per run, or interactively with `shell`. "
             f"The address comes from {ADDRESS_ENV_VAR} (default {DEFAULT_ADDRESS})."
         ),
     )

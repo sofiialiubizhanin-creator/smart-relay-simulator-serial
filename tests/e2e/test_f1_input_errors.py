@@ -5,7 +5,7 @@ Per validation.md V4, each rejected input starts from the state it would change 
 """
 import pytest
 
-from tests.e2e.helpers import expect_response, wait_until
+from tests.e2e.helpers import expect_response
 
 
 @pytest.mark.parametrize(
@@ -116,12 +116,8 @@ def test_F1_AC_12_very_long_line_gets_exactly_one_error(host, control, simulator
 
     expect_response(host.send_raw("X" * 10_000), "ERR TOO_LONG", 1)
 
-    def sent() -> list[bytes]:
-        return [data for _, direction, data in simulator.exchange_log() if direction == "TX"]
-
-    # The host can exit before the simulator records its TX entry, so wait for the record.
-    wait_until(lambda: sent(), timeout=2, message="simulator never recorded its response")
-    assert sent() == [b"ERR TOO_LONG"], f"simulator sent {sent()!r}"
+    sent = [data for _, direction, data in simulator.exchange_log() if direction == "TX"]
+    assert sent == [b"ERR TOO_LONG"], f"simulator sent {sent!r}"
 
     assert control.get_state() == "OFF"
     expect_response(host.status(), "STATUS OFF", 0)

@@ -12,7 +12,7 @@ import socketserver
 import threading
 
 from .exchange_log import ExchangeLog
-from .protocol import LineReader, _TooLong
+from .protocol import TOO_LONG, LineReader
 from .relay import STATES, RelayDevice
 
 _POLL_SECONDS = 0.2
@@ -95,7 +95,7 @@ class _ControlHandler(socketserver.BaseRequestHandler):
             if not data:
                 return
             for line in reader.feed(data):
-                if isinstance(line, _TooLong):
+                if line is TOO_LONG:
                     response = b"ERR line too long"
                 else:
                     response = execute(self.server.device, self.server.log, line)

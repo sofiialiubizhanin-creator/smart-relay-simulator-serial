@@ -3,8 +3,6 @@
 **Status:** v1.1, reviewed 2026-11-19 (v1 plus change C1, see "Changes").
 **Phase:** 1 (see `specs/roadmap.md`)
 
-> Items marked belong to change C1 and still need review.
-
 ## 1. Scope
 
 F1 delivers:

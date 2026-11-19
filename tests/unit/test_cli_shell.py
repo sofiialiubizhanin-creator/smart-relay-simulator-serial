@@ -159,7 +159,8 @@ def test_idle_shell_holds_no_connection(sim):
         # The shell is now idle, waiting for input. Another client must be served at once.
         with socket.create_connection(("127.0.0.1", sim.serial_port), timeout=2) as sock:
             sock.sendall(b"ON\n")
-            assert sock.makefile("rb").readline() == b"OK\n"
+            with sock.makefile("rb") as replies:
+                assert replies.readline() == b"OK\n"
         out, err = proc.communicate(b"STATUS\n", timeout=30)
     finally:
         if proc.poll() is None:

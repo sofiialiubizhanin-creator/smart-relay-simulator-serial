@@ -11,7 +11,7 @@ Every phase also ends with:
 **Scope:** relay simulator with a control API, host CLI, serial-over-TCP transport and the commands `ON`, `OFF`, `STATUS` with error handling.
 
 **Completion Criteria:**
-- Every F1 acceptance criteria is covered by at least one E2E test that references its AC ID.
+- Every F1 acceptance criterion is covered by at least one E2E test that references its AC ID.
 - The full E2E suite is green and runs with one command.
 - Negative and fault-injection scenarios are included (unknown command, lowercase, empty line, repeated `ON`, silent device).
 - A CHANGELOG.md entry for Phase 1 is added.
@@ -24,6 +24,6 @@ Every phase also ends with:
 **Completion Criteria:**
 - F1 requirements.md is updated, including a "Changes" section.
 - New and changed ACs are covered by E2E tests.
-- Regression: the full suite is green. Any update F1 tests are traced to the requirement change.
+- Regression: the full suite is green. Any updated F1 tests are traced to the requirement change.
 - A CHANGELOG.md entry for Phase 2 is added.
 - The README.md is updated for Phase 2 and still describes how to run the program and all tests with one command.

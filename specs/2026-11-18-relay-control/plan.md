@@ -16,7 +16,7 @@ All decisions were accepted in review on 2026-11-19.
 
 | ID | Decision |
 |---|---|
-| D1 | **Host address:** environment variable only (req §4.1). CLI form: `relay-host [--timeout S] on\|off\|status\|send <line>`. |
+| D1 | **Host address:** environment variable only (req §4.1). CLI form: `relay-host [--timeout S] on\|off\|status\|send <line>\|shell` (`shell`: §12). |
 | D2 | **Simulator ports:** serial `5555`, control `5556`, bound to `127.0.0.1`. Started manually with `relay-sim [--bind ADDR] [--port N] [--control-port N]`. Port `0` means "pick a free port", which the tests use. |
 | D3 | **Control API wire format:** see §0.1. |
 | D4 | *Removed: the dropped-connection case is out of scope (req §8).* |
@@ -236,7 +236,7 @@ None.
 
 ## 12. Change C1: interactive shell (`relay-host shell`)
 
-Implements req §4.4 and F1-AC-24 … F1-AC-29. Groups 1–9 are done. The Phase 1 sign-off (9.7) waits until this group is complete. Same order as before: documents, then code, then tests, then validation.
+Implements req §4.4 and F1-AC-24 … F1-AC-29. Groups 1–9 were done first. The Phase 1 sign-off (9.7) followed after this group. Same order as before: documents, then code, then tests, then validation.
 
 ### Decisions for C1
 
@@ -284,9 +284,9 @@ All earlier tests must still pass.
 
 12.5 E2E fixtures: implement `host.shell` and `host.open_shell` in `tests/e2e/conftest.py` as in 12.2. *Done 2026-11-19.*
 
-12.6 E2E tests in `tests/e2e/test_f1_host_shell.py` for F1-AC-24 … F1-AC-28. *Done 2026-11-19.* They are derived only from req §6 and `validation.md`, and are named and documented as in §8. Fill in their traceability rows in the same change.
+12.6 E2E tests in `tests/e2e/test_f1_host_shell.py` for F1-AC-24 … F1-AC-28 (F1-AC-29 was added in 12.8a). *Done 2026-11-19.* They are derived only from req §6 and `validation.md`, and are named and documented as in §8. Fill in their traceability rows in the same change.
 
-**Done when:** the traceability checker reports 28/28 ACs covered and 0 errors.
+**Done when:** the traceability checker reports every AC covered and 0 errors (28/28 after 12.6, 29/29 after 12.8a).
 
 12.7 Check by hand in a real PowerShell window (not automatable, req §7). *Done 2026-11-19 by the user: all as expected (validation-results.md §3).*
    - the `relay> ` prompt appears,
@@ -296,7 +296,7 @@ All earlier tests must still pass.
 
 Record the result in `validation-results.md`.
 
-12.8 Documentation: add a "Shell" section to `README.md`. *Done 2026-11-19.* Update the Phase 1 `CHANGELOG.md` entry to include the shell, since Phase 1 isn't signed off yet. Run every README example before publishing it.
+12.8 Documentation: add a "Shell" section to `README.md`. *Done 2026-11-19.* Update the Phase 1 `CHANGELOG.md` entry to include the shell. Run every README example before publishing it.
 
 12.8a *Done 2026-11-19.* Byte-order mark (found in 12.8 when the PowerShell pipe example failed; approved by the user 2026-11-19). Spec first: req §4.4, F1-AC-29, the validation.md steps and traceability row. Then drop the mark in `run_shell`, add a unit test and the E2E test for F1-AC-29, and re-run the README example.
 

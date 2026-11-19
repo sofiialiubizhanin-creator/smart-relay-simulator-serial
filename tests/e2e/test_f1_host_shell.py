@@ -113,7 +113,7 @@ def test_F1_AC_29_leading_byte_order_mark_is_dropped(host, control, simulator):
     """F1-AC-29: A leading byte-order mark is dropped.
 
     From `OFF`, `relay-host shell` with input that starts with the UTF-8 byte-order mark followed by
-    the lines `ON` and `STATUS` prints exactly `OK\nSTATUS ON\n`, exits 0, and the simulator
+    the lines `ON` and `STATUS` prints exactly `OK\\nSTATUS ON\\n`, exits 0, and the simulator
     receives `ON` (without the mark) and `STATUS`.
     """
     assert control.get_state() == "OFF"

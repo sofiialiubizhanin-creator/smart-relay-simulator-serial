@@ -1,6 +1,6 @@
 # F1: Relay control and status - Validation
 
-**Status:** v1.1, reviewed 2026-11-19 (v1 plus change C1: F1-AC-24 … F1-AC-28).
+**Status:** v1.1, reviewed 2026-11-19 (v1 plus change C1: F1-AC-24 … F1-AC-29).
 **Phase:** 1 (see `specs/roadmap.md`)
 **Inputs:** `requirements.md` (cited as "req §N"), `plan.md`, `.claude/skills/e2e-test-conventions/` (fixture contract v1.3)
 
@@ -18,7 +18,7 @@ These apply to every F1 E2E test unless an AC below says otherwise.
 - **V4 State:** whenever an AC mentions the state, the test reads it with `control.get_state()`.
   - For "the state doesn't change", the test starts from the state that the rejected input *would* change if it were accepted. For example, `on` is tried from `OFF` and `off` from `ON`.
   - Inputs that change nothing even when accepted (`status`) start from `OFF`.
-- **V5 Exchange log:** `simulator.exchange_log()` is asserted only where an AC states what the simulator receives or sends. It may also be used with `wait_until` as a synchronisation step (F1-AC-16).
+- **V5 Exchange log:** `simulator.exchange_log()` is asserted only where an AC states what the simulator receives or sends. It may also be used with `wait_until` as a synchronisation step (F1-AC-16, F1-AC-26).
 - **V6 Parametrisation:** each input listed in an AC is its own parametrized case.
 - **V7 Timeouts:**
   - Tests use the host's default timeout.
@@ -224,9 +224,9 @@ These bounds are part of the contract. Widening them counts as weakening the tes
 | Kind | ACs |
 |---|---|
 | Positive | F1-AC-01, 02, 03, 04, 07, 14, 17, 18, 19, 24, 26 |
-| Negative | F1-AC-08, 09, 10, 11, 20, 23, 24 (lowercase and empty line in the shell), 28 |
+| Negative | F1-AC-08, 09, 10, 11, 20, 22 (no simulator), 23, 24 (lowercase and empty line in the shell), 28 |
 | Edge | F1-AC-05, 06, 07, 12, 27, 29 |
-| Fault injection (control API) | F1-AC-13, 14, 15, 16, 17, 21, 22, 25 |
+| Fault injection (control API) | F1-AC-13, 14, 15, 16, 17, 21, 25 |
 
 The negative and fault cases required by the roadmap:
 - Unknown command: F1-AC-10.

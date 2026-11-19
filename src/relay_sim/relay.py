@@ -4,7 +4,7 @@ from __future__ import annotations
 import threading
 
 from .clock import Clock, ManualClock
-from .protocol import Line, _TooLong
+from .protocol import TOO_LONG, Line
 
 ON = "ON"
 OFF = "OFF"
@@ -41,7 +41,7 @@ class RelayDevice:
                 return None
             if self._fault:
                 return ERR_FAULT
-            if isinstance(line, _TooLong):
+            if line is TOO_LONG:
                 return ERR_TOO_LONG
             if line == b"":
                 return ERR_EMPTY
