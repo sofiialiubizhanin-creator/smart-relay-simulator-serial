@@ -2,6 +2,39 @@
 
 All notable changes to this project are recorded here, one entry per completed phase (see [specs/roadmap.md](specs/roadmap.md)).
 
+## [0.2.0] - 2026-11-19 - Phase 2: Change request C2, toggle rate limit (`BUSY`)
+
+Specs: [requirements, change C2](specs/2026-11-18-relay-control/requirements.md) · [plan §13](specs/2026-11-18-relay-control/plan.md) · [validation](specs/2026-11-18-relay-control/validation.md) · [results §5–§6](specs/2026-11-18-relay-control/validation-results.md)
+
+### Added
+- **`ERR BUSY`**: a toggle (`ON` while `OFF`, or `OFF` while `ON`) that comes less than 2.0 s after the last accepted toggle is rejected, and the state doesn't change.
+  - Rejected toggles don't restart the window.
+  - `STATUS` and a repeated `ON` or `OFF` are never `BUSY`.
+  - Faults, silence and invalid lines still take precedence.
+  - The host exits 1 on `ERR BUSY`, as for every `ERR` response.
+- **Real-time clock for `relay-sim`**: when run by hand, the simulator follows real time, so toggles 2 s apart work. The E2E tests keep the simulated clock and never wait in real time.
+- **E2E tests** for F1-AC-30 … F1-AC-36 (`tests/e2e/test_f1_busy.py`), and component tests for the rate limit and the clocks (`tests/unit/test_busy.py`).
+
+### Changed
+- **Requirements** (F1 v1.2, change C2):
+  - a new §2.6;
+  - a new precedence rule, **Busy**;
+  - `RESET` now also clears the window, and `SET_STATE` is defined as not a toggle;
+  - F1-AC-19 now includes `ERR BUSY`.
+- **Tests updated after the regression run** (validation-results.md §5): the run found 4 component tests that send two toggles with no time passing between them. Each now advances the clock or sends a non-toggle, and names C2.
+  - The F1-AC-19 E2E test gains an `ERR BUSY` case and a `Changed: C2` line.
+  - No other E2E test changed.
+- **The `e2e-test-conventions` skill (v1.2)**, refined after an evaluation (`reports/skill-evals.md`, 25/27 → 27/27):
+  - a regression-first workflow after a change request;
+  - guidance on arranging protocol history through the host.
+- **README**: a toggle rate limit section, and `ERR BUSY` in the protocol summary.
+
+### Validation
+- **Regression run** with the unchanged suite: 4 component tests failed, all explained by C2. All E2E tests passed unchanged.
+- **After the updates:** `pytest` gives 317 passed. Traceability checker: 36/36 ACs covered, 0 errors.
+- **Hand check:** `relay-sim` follows real time (all steps as expected).
+- The final validation run is recorded in validation-results.md §7.
+
 ## [0.1.0] - 2026-11-19 - Phase 1: Simulator + F1 (Relay control and status)
 
 Specs: [requirements](specs/2026-11-18-relay-control/requirements.md) · [plan](specs/2026-11-18-relay-control/plan.md) · [validation](specs/2026-11-18-relay-control/validation.md) · [results](specs/2026-11-18-relay-control/validation-results.md)

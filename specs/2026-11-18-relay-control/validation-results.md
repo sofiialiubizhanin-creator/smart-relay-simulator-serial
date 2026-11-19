@@ -142,3 +142,19 @@ Only the tests listed above were changed. Each change keeps the test's intent an
 **After the updates:**
 - `pytest`: **310 passed**.
 - The checker still shows 29/36. The 7 missing tests (F1-AC-30 … 36) come in plan 13.8.
+
+## 6. `relay-sim` real-time hand check, change C2 (2026-11-19, plan 13.9)
+
+**Purpose:** confirm that `relay-sim`, when run by hand, follows real time (req §2.6, plan D14). E2E tests must not wait in real time, so this isn't automated.
+
+**Done by:** the user, in Windows PowerShell. `relay-sim` was restarted on commit `91fa1b8`, and the commands below ran in a second window.
+
+| # | Step | Expected | Result |
+|---|---|---|---|
+| 1 | `relay-host on; relay-host off` (one line) | `OK`, then `ERR BUSY` | As expected |
+| 2 | `$LASTEXITCODE` | `1` | As expected |
+| 3 | `relay-host status` | `STATUS ON` (the rejected `OFF` changed nothing) | As expected |
+| 4 | Wait at least 2 s, then `relay-host off` | `OK` | As expected |
+| 5 | `relay-host status` | `STATUS OFF` | As expected |
+
+**Result:** all steps as expected. Real time reopens the window, so `relay-sim` follows real time.

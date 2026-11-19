@@ -53,19 +53,34 @@ relay-host status              # STATUS OFF
 relay-host on                  # OK
 relay-host status              # STATUS ON
 relay-host send "on"           # ERR UNKNOWN_CMD   (send passes a raw line unchanged)
-relay-host --timeout 0.5 off   # OK
+relay-host --timeout 0.5 off   # OK                (at least 2 s after `on`; see "Toggle rate limit")
 $LASTEXITCODE                  # exit code of the last command (bash: $?)
 ```
 
 | Exit code (single commands) | Meaning |
 |---|---|
 | 0 | The device responded without an error (`OK`, `STATUS ON`, `STATUS OFF`) |
-| 1 | The device responded `ERR <CODE>` |
+| 1 | The device responded `ERR <CODE>`, for example `ERR BUSY` |
 | 2 | Usage error (nothing was sent) |
 | 3 | No response within the timeout (default 1.0 s) |
 | 4 | Cannot connect, or `RELAY_HOST_ADDRESS` is invalid |
 
 The host connects to `127.0.0.1:5555` by default. To use another address, set `RELAY_HOST_ADDRESS=HOST:PORT`.
+
+### Toggle rate limit (`BUSY`)
+
+The relay accepts a state change (a *toggle*: `ON` while `OFF`, or `OFF` while `ON`) at most once every 2 seconds. A toggle less than 2.0 s after the last accepted one gets `ERR BUSY` and changes nothing:
+
+```powershell
+relay-host on; relay-host off  # OK, then ERR BUSY (the off came too soon)
+relay-host status              # STATUS ON
+# wait at least 2 seconds
+relay-host off                 # OK
+```
+
+- Only toggles count. `STATUS` and a repeated `ON` or `OFF` are never `BUSY`.
+- A rejected toggle doesn't restart the 2 seconds; they count from the last accepted toggle.
+- `relay-sim` follows real time. The E2E tests use a simulated clock instead (moved through the control API), so they never wait 2 real seconds.
 
 ### Shell: type commands directly
 
@@ -87,6 +102,7 @@ ERR EMPTY
 ```
 
 - Each line goes to the device **exactly as typed**, so commands must be uppercase: `ON`, `OFF`, `STATUS`. An empty line is sent too.
+- The 2-second toggle limit applies here too: `ON` and then a quick `OFF` gets `ERR BUSY`.
 - If a line gets no response, or the simulator can't be reached, the shell prints a one-line message and keeps going.
 - Leave with **Ctrl+Z then Enter** (Windows), **Ctrl+D** (Linux/macOS), or **Ctrl+C**. The exit code is 0.
 - The shell connects once per line, so it never blocks other clients. You can run `relay-host status` in another window while a shell is open.
@@ -103,7 +119,7 @@ Type `ON`, `OFF` or `STATUS` and press Enter. Exit with Ctrl+]. The simulator se
 
 ## Protocol in brief
 
-One ASCII command per line, ending with `\n`. Commands are exactly `ON`, `OFF` and `STATUS` (uppercase, no arguments). Responses: `OK`, `STATUS ON`, `STATUS OFF`, or `ERR UNKNOWN_CMD` / `ERR EMPTY` / `ERR TOO_LONG` (over 32 bytes) / `ERR FAULT`. The full definition is in [specs/2026-11-18-relay-control/requirements.md](specs/2026-11-18-relay-control/requirements.md).
+One ASCII command per line, ending with `\n`. Commands are exactly `ON`, `OFF` and `STATUS` (uppercase, no arguments). Responses: `OK`, `STATUS ON`, `STATUS OFF`, or `ERR UNKNOWN_CMD` / `ERR EMPTY` / `ERR TOO_LONG` (over 32 bytes) / `ERR FAULT` / `ERR BUSY` (a toggle within 2 s of the last one). The full definition is in [specs/2026-11-18-relay-control/requirements.md](specs/2026-11-18-relay-control/requirements.md).
 
 ## Project layout
 

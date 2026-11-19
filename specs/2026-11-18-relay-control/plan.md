@@ -387,13 +387,13 @@ All five are component tests. No E2E test is expected to fail, because no F1 E2E
 
 **Done when:** the checker reports 36/36 ACs and 0 errors.
 
-13.9 Hand check (req §7): with `relay-sim` run by hand,
+13.9 Hand check (req §7). *Done 2026-11-19 by the user: all as expected (validation-results.md §6).* With `relay-sim` run by hand,
    - `relay-host on` then immediately `relay-host off` → `ERR BUSY`;
    - wait at least 2 s, then `relay-host off` → `OK`.
 
    Record the result in `validation-results.md`.
 
-13.10 Documentation:
+13.10 Documentation. *Done 2026-11-19.*
    - **README:** `ERR BUSY` in the protocol summary and in the exit-code row for `ERR`; that `relay-sim` follows real time (toggles at least 2 s apart). Run every README example before publishing it.
    - **CHANGELOG:** a `[0.2.0]` entry for Phase 2. Bump the version in `pyproject.toml` to `0.2.0`.
 

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "smart-relay-simulator"
-version = "0.1.0"
+version = "0.2.0"
 description = "A simulated relay controlled over serial-over-TCP, with a host CLI."
 requires-python = ">=3.11"
 dependencies = ["pyserial>=3.5"]
