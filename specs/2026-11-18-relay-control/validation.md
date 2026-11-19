@@ -329,3 +329,4 @@ Results are recorded in [validation-results.md](validation-results.md) (decided 
 - §4 Validation run including C1 (2026-11-19): 286 passed, 29/29 ACs covered, checker clean. The shell mutation check was skipped by the user's decision.
 - §5 Regression run after C2 (2026-11-19, rule V10): 4 component tests fail, all explained by C2 (quick toggle sequences); all E2E tests pass unchanged.
 - §6 `relay-sim` real-time hand check, C2 (2026-11-19): all as expected.
+- §7 Final validation run, Phase 2 (2026-11-19, commit `7dfb858`): 317 passed, 36/36 ACs covered, checker clean.

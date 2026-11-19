@@ -31,7 +31,7 @@ Specs: [requirements, change C2](specs/2026-11-18-relay-control/requirements.md)
 
 ### Validation
 - **Regression run** with the unchanged suite: 4 component tests failed, all explained by C2. All E2E tests passed unchanged.
-- **After the updates:** `pytest` gives 317 passed. Traceability checker: 36/36 ACs covered, 0 errors.
+- **After the updates:** `pytest` gives 317 passed (74 E2E + 243 component). Traceability checker: 36/36 ACs covered, 0 errors.
 - **Hand check:** `relay-sim` follows real time (all steps as expected).
 - The final validation run is recorded in validation-results.md §7.
 

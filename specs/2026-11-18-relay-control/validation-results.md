@@ -158,3 +158,29 @@ Only the tests listed above were changed. Each change keeps the test's intent an
 | 5 | `relay-host status` | `STATUS OFF` | As expected |
 
 **Result:** all steps as expected. Real time reopens the window, so `relay-sim` follows real time.
+
+## 7. Final validation run, Phase 2 (2026-11-19, plan 13.11)
+
+**Commit:** `7dfb858`. **Environment:** as in §2, plus package version 0.2.0.
+
+| Check | Result |
+|---|---|
+| `check_traceability.py` | **36/36 ACs** covered, 39 test functions, 0 errors, 0 warnings (exit 0) |
+| `pytest` (one command, full suite) | **317 passed** in 84.1 s: 74 E2E cases + 243 component tests (exit 0) |
+| `reports/exchange.log` | A section for every one of the 74 E2E cases, each marked passed |
+| Each E2E file on its own | `test_f1_busy.py` 7 · `test_f1_fault_silence_reset.py` 11 · `test_f1_host_cli.py` 23 · `test_f1_host_shell.py` 7 · `test_f1_input_errors.py` 19 · `test_f1_relay_control.py` 7: all passed |
+| One test per file on its own | F1-AC-07, F1-AC-12 (10 000 bytes), F1-AC-16, F1-AC-19 (8 cases incl. `ERR BUSY`), F1-AC-26, F1-AC-32: all passed |
+| Regression after C2 (§5) | 4 component tests failed on the unchanged suite, all explained by C2. They were updated as recorded; no unexplained failure |
+| Hand check, real time (§6) | All as expected |
+| README examples | Run against a real-time `relay-sim`: output as documented |
+
+**Roadmap Phase 2 criteria:**
+- F1 requirements.md has a "Changes" section (C2).
+- The new ACs (F1-AC-30 … 36) and the changed AC (F1-AC-19) are covered by E2E tests.
+- The full suite is green. The updated F1 tests are traced to C2: their comments name C2, F1-AC-19 has a `Changed: C2` line, and §5 records them.
+- There's a CHANGELOG `[0.2.0]` entry.
+- The README is updated and still explains running everything with one command.
+
+**Mutation check for C2:** not run. The only evidence that BUSY tests can fail comes from the skill-evaluation runs: there, F1-AC-32 and the F1-AC-19 `ERR BUSY` case were red against code without BUSY. The other new tests (F1-AC-30, 31, 33–36) have not been shown to fail for a faulty BUSY implementation.
+
+**Open spec questions:** none.

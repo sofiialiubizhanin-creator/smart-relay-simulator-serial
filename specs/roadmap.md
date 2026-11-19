@@ -17,7 +17,7 @@ Every phase also ends with:
 - A CHANGELOG.md entry for Phase 1 is added.
 - The README.md describes how to run the program and all tests with one command.
 
-## Phase 2: Change request - Toggle rate limit (BUSY) - *In progress*
+## Phase 2: Change request - Toggle rate limit (BUSY) - *Done (signed off 2026-11-19)*
 
 **Scope:** the relay rejects the toggle that comes within 2 seconds of the previous one, with a `BUSY` error. Tests use controlled simulator time.
 

@@ -397,7 +397,7 @@ All five are component tests. No E2E test is expected to fail, because no F1 E2E
    - **README:** `ERR BUSY` in the protocol summary and in the exit-code row for `ERR`; that `relay-sim` follows real time (toggles at least 2 s apart). Run every README example before publishing it.
    - **CHANGELOG:** a `[0.2.0]` entry for Phase 2. Bump the version in `pyproject.toml` to `0.2.0`.
 
-13.11 Validation run:
+13.11 Validation run. *Done 2026-11-19 (validation-results.md §7); Phase 2 signed off by the user, roadmap updated.*
    - the checker;
    - the full `pytest` run;
    - each E2E file on its own, and one test per file on its own.

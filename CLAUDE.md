@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project state
 
-Spec-Driven Development project for a Smart Relay Simulator (one simulated relay controlled over serial-over-TCP, plus a host CLI). No hardware is involved. Phase 1 (F1, relay control and status, including `relay-host shell`) is implemented, validated and signed off (2026-11-19). Phase 2 (BUSY rate limit) is next.
+Spec-Driven Development project for a Smart Relay Simulator (one simulated relay controlled over serial-over-TCP, plus a host CLI). No hardware is involved. Phase 1 (F1, relay control and status, including `relay-host shell`) is implemented, validated and signed off (2026-11-19). Phase 2 (change request C2, BUSY toggle rate limit) is implemented, validated and signed off (2026-11-19). No further phase is planned in the roadmap.
 
 `specs/mission.md`, `specs/roadmap.md` and `specs/tech-stack.md` are authoritative and override your own assumptions. If something conflicts with them, stop and ask instead of choosing yourself. Read them before starting any phase.
 
@@ -47,4 +47,4 @@ Python 3.11+.
 
 - **Every phase** ends with a `CHANGELOG.md` entry and a `README.md` that explains how to run the program and all tests with one command.
 - **Phase 1 (done, signed off 2026-11-19):** simulator, control API, host CLI (including `relay-host shell`), transport, and the commands `ON` / `OFF` / `STATUS` with error handling. Negative cases include unknown command, lowercase, empty line, repeated `ON`, and a silent device.
-- **Phase 2 (in progress):** reject a toggle that comes within 2 seconds of the previous one with `BUSY`, tested with the controlled clock. This phase also requires a "Changes" section in the F1 `requirements.md` and traceability for any updated F1 tests.
+- **Phase 2 (done, signed off 2026-11-19):** reject a toggle that comes within 2 seconds of the previous one with `BUSY`, tested with the controlled clock. This phase also requires a "Changes" section in the F1 `requirements.md` and traceability for any updated F1 tests.
